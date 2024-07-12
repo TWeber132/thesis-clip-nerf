@@ -1,0 +1,5 @@
+defaults:
+  - default_dngf
+batch_size: 4
+model_path: "/home/hephaestus/workspace/data/models/grasp/simple/dngf_1_view_ce_quat"
+loss: "cross_entropy"

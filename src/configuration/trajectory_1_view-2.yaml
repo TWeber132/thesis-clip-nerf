@@ -1,0 +1,6 @@
+defaults:
+  - default_trajectory
+  - nerf_model: 1_view
+  - grasp_training: trajectory_1_view-2
+  - validation: 3_images
+  - grasp_model: trajectory-2

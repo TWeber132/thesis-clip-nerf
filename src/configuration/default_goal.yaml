@@ -1,0 +1,9 @@
+defaults:
+  - default
+  - dataset: goal
+  - grasp_model: goal
+  - generator_grasp: goal
+valid_sample_indices:
+  - 0
+  - 4
+  - 7

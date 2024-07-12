@@ -1,0 +1,6 @@
+defaults:
+  - default_grasp
+  - nerf_model: 3_views
+  - grasp_training: dngf_3_views
+  - validation: 3_images
+  - override generator_grasp: dngf

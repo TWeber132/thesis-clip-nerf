@@ -1,0 +1,10 @@
+optimizer_config:
+  n_initial_guesses: 4096
+  n_images: 2
+  clip_translation: true
+optimization_config:
+  n_optimization_steps: 19
+  init_lr_t: 0.01776
+  init_lr_r: 0.661
+  decay_t: 0.8408
+  decay_r: 0.8262

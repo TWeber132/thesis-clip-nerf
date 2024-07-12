@@ -1,0 +1,4 @@
+defaults:
+  - default
+pose_augmentation_factor: 16
+n_future_poses: 4

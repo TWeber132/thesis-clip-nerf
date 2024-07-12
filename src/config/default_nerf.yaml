@@ -1,0 +1,9 @@
+defaults:
+  - default
+  - dataset: nerf
+valid_sample_idx: 3
+valid_perspective_src_indices:
+  - 5
+  - 8
+  - 15
+valid_perspective_tgt_idx: 12

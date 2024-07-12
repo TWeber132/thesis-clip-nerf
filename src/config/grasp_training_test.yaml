@@ -1,0 +1,5 @@
+defaults:
+  - default_grasp
+  - nerf_model: 3_views
+  - grasp_training: grasp_test
+  - validation: 3_images

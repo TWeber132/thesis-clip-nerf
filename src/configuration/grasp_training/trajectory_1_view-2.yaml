@@ -1,0 +1,5 @@
+defaults:
+  - default
+model_path: "/home/jovyan/data/models/grasp/simple/trajectory_1_view-2"
+backbone_path: "/home/jovyan/data/models/nerf/simple/1_view"
+loss: "kl_divergence"

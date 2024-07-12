@@ -1,0 +1,7 @@
+defaults:
+  - grasp_model: grasp
+  - generator_grasp: grasp
+  - nerf_model: 1_view
+  - optimizer_config: 2_images_quat
+model_path: /home/hephaestus/workspace/data/models/grasp/simple/grasp_1_view_ebm
+backbone_path: /home/hephaestus/workspace/data/models/nerf/simple/1_view

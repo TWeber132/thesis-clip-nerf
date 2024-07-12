@@ -1,0 +1,4 @@
+n_epochs: 400
+eval_after_epochs: 4
+learning_rate: 0.0001
+batch_size: 8

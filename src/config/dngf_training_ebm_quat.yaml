@@ -1,0 +1,8 @@
+defaults:
+  - default_grasp
+  - nerf_model: 1_view
+  - grasp_training: dngf_1_view_ebm_quat
+  - validation: 2_images
+  - override grasp_model: dngf_quat
+  - override generator_grasp: dngf
+  - override dataset: grad

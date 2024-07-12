@@ -1,0 +1,11 @@
+.idea/
+src/outputs/
+*.pyc
+paper.md
+run_dev_local.sh
+run_jupyter_local.sh
+*.ipynb_checkpoints/
+outputs/
+dependencies/manipulation_tasks/build/
+dependencies/manipulation_tasks/manipulation_tasks.egg-info/
+

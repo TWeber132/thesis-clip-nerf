@@ -1,0 +1,4 @@
+defaults:
+  - default_nerf
+  - nerf_model: 3_view
+  - nerf_training: 3_view

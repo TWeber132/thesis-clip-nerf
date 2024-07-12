@@ -1,0 +1,5 @@
+defaults:
+  - default_goal
+  - nerf_model: 1_view
+  - grasp_training: goal_1_view
+  - validation: 3_images

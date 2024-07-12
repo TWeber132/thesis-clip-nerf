@@ -1,0 +1,2 @@
+n_epochs: 1600
+eval_after_epochs: 16

@@ -1,0 +1,5 @@
+defaults:
+  - default_grasp
+batch_size: 4
+model_path: "/home/hephaestus/workspace/data/models/grasp/simple/grasp_test"
+backbone_path: "/home/hephaestus/workspace/data/models/nerf/simple/3_views"

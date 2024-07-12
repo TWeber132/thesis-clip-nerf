@@ -1,0 +1,4 @@
+n_epochs: 40
+eval_after_epochs: 1
+learning_rate: 0.0001
+backbone_path: "/home/hephaestus/workspace/data/models/nerf/simple/1_view"

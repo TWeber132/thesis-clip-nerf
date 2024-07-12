@@ -1,0 +1,10 @@
+oracle_type: "suction_grasp-oracle"
+gripper_offset:
+  translation:
+    - 0.0
+    - 0.0
+    - 0.0
+  rotation:
+    - 3.14159265359
+    - 0.0
+    - 1.57079632679

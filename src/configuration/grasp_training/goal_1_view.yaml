@@ -1,0 +1,5 @@
+defaults:
+  - default
+model_path: "/home/jovyan/data/storage/models/grasp/simple/goal_1_view"
+backbone_path: "/home/jovyan/data/storage/models/nerf/simple/1_view"
+loss: "kl_divergence"

@@ -1,0 +1,4 @@
+defaults:
+  - default_grasp_1_view
+model_path: "/home/hephaestus/workspace/data/models/grasp/simple/grasp_1_view_ebm"
+loss: "kl_divergence"

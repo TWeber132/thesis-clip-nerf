@@ -1,0 +1,4 @@
+path: "/home/hephaestus/workspace/data/datasets/nerf/simple"
+n_perspectives: 50
+record_grasp_pose: False
+record_order: False

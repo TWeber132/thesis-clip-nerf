@@ -1,0 +1,4 @@
+- "manipulation_tasks.plugins.primitives.pick_and_place"
+- "manipulation_tasks.plugins.objects.base"
+- "manipulation_tasks.plugins.tasks.grasp_task"
+- "manipulation_tasks.plugins.oracles.suction_grasp"

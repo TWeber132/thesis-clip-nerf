@@ -1,0 +1,4 @@
+path: "/home/hephaestus/workspace/data/datasets/grasp_baseline_grad/simple"
+n_perspectives: 5
+record_grasp_pose: True
+record_order: True

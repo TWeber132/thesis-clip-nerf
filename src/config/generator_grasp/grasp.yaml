@@ -1,0 +1,4 @@
+defaults:
+  - default
+n_points_train: 512
+n_r_fraction: 32
