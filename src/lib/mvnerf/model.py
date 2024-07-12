@@ -8,6 +8,8 @@ from .layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures
 from .nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_projection_features_mv, \
     world_to_camera_direction_vector_mv, sigma_to_alpha, sample_pdf, optimize, get_rays
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
+from lib.clip.main import load_clip
+from lib.clip.utils import preprocess_tf
 
 
 class MVVNeRFRenderer(tf.keras.Model):
@@ -25,6 +27,9 @@ class MVVNeRFRenderer(tf.keras.Model):
         self.fine_readout = RenderReadout(4)
 
         self.visual_features = VisualFeatures(n_features, original_image_size)
+
+        self.clip_visual_features = load_clip().visual
+        self.clip_visual_features.trainable = False
 
         self.n_samples = n_samples
         self.n_rays_train = n_rays_train
@@ -49,8 +54,18 @@ class MVVNeRFRenderer(tf.keras.Model):
     def call(self, inputs, training=False, mask=None):
         src_images = inputs[2]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
+
+        clip_images = preprocess_tf(src_images)
+        clip_features = self.clip_visual_features(clip_images)
+        print(tf.shape(clip_features[0]))
+        # print(tf.shape(clip_features[1]))
+        # print(tf.shape(clip_features[2]))
+        # print(tf.shape(clip_features[3]))
+
         batched_features = self.encode(src_images)
-        batched_features = rearrange(batched_features, '(b n) h w c -> b n h w c', b=self.batch_size)
+        # print(tf.shape(batched_features))
+        batched_features = rearrange(
+            batched_features, '(b n) h w c -> b n h w c', b=self.batch_size)
         return self._call(inputs, self.n_rays_train, self.batch_size, batched_features)
 
     @staticmethod
@@ -58,9 +73,11 @@ class MVVNeRFRenderer(tf.keras.Model):
         dists = zs[..., 1:] - zs[..., :-1]
         dists = tf.concat([dists, dists[..., -1:]], axis=-1)
         alpha = sigma_to_alpha(density, dists)
-        transmittance = tf.math.cumprod(1 - alpha + 1e-10, axis=-1, exclusive=True)
+        transmittance = tf.math.cumprod(
+            1 - alpha + 1e-10, axis=-1, exclusive=True)
         weights = alpha * transmittance
-        rgb = tf.reduce_sum(rearrange(weights, 'b nr np -> b nr np ()') * chromacity, axis=-2)
+        rgb = tf.reduce_sum(
+            rearrange(weights, 'b nr np -> b nr np ()') * chromacity, axis=-2)
         depth = tf.reduce_sum(weights * zs, axis=-1)
         return rgb, depth, weights
 
@@ -83,26 +100,33 @@ class MVVNeRFRenderer(tf.keras.Model):
         features = get_projection_features_mv(normalized_images, batched_features, pixel_locations, n_rays,
                                               self.n_samples, batch_size)
         # transform rays direction from world to src camera coordinates
-        camera_directions = world_to_camera_direction_vector_mv(ray_directions, src_extrinsics_inv, self.n_views)
-        repeated_camera_directions = repeat(camera_directions, 'b nv nr d -> b nv nr np d', np=self.n_samples)
-        repeated_camera_directions = rearrange(repeated_camera_directions, 'b nv nr np d -> (b nv) nr np d')
-        camera_points_homogeneous = rearrange(camera_points_homogeneous, 'b nv nr np d -> (b nv) nr np d')
+        camera_directions = world_to_camera_direction_vector_mv(
+            ray_directions, src_extrinsics_inv, self.n_views)
+        repeated_camera_directions = repeat(
+            camera_directions, 'b nv nr d -> b nv nr np d', np=self.n_samples)
+        repeated_camera_directions = rearrange(
+            repeated_camera_directions, 'b nv nr np d -> (b nv) nr np d')
+        camera_points_homogeneous = rearrange(
+            camera_points_homogeneous, 'b nv nr np d -> (b nv) nr np d')
         features = rearrange(features, 'b nv nr np d -> (b nv) nr np d')
         # compute coarse chromacity and density
         coarse_embedding = self.coarse_embedding(
             (camera_points_homogeneous[..., :3], repeated_camera_directions, features))
-        coarse_chromacity, coarse_density = self.coarse_readout(coarse_embedding)
+        coarse_chromacity, coarse_density = self.coarse_readout(
+            coarse_embedding)
         # render rays
         rgb, depth, weights = MVVNeRFRenderer.volumetric_render(points_along_ray, coarse_density,
                                                                 coarse_chromacity)
         # resample points based on estimated density
-        z_vals_mid = 0.5 * (points_along_ray[..., 1:] + points_along_ray[..., :-1])
+        z_vals_mid = 0.5 * \
+            (points_along_ray[..., 1:] + points_along_ray[..., :-1])
         probs = weights[..., 1:-1]
         z_samples = sample_pdf(z_vals_mid, probs, self.n_samples)
         # compute fine sampled points
         all_zs = tf.concat([points_along_ray, z_samples], axis=-1)
         all_zs = tf.sort(all_zs, axis=-1)
-        fine_points = ray_origins[:, :, tf.newaxis, :] + all_zs[..., tf.newaxis] * ray_directions[:, :, tf.newaxis, :]
+        fine_points = ray_origins[:, :, tf.newaxis, :] + \
+            all_zs[..., tf.newaxis] * ray_directions[:, :, tf.newaxis, :]
 
         # repeat the whole process for the fine points (twice as many samples)
         fine_pixel_locations, fine_camera_points_homogeneous = compute_pixel_in_image_mv(fine_points,
@@ -111,17 +135,23 @@ class MVVNeRFRenderer(tf.keras.Model):
         fine_features = get_projection_features_mv(normalized_images, batched_features, fine_pixel_locations, n_rays,
                                                    self.n_samples * 2, batch_size)
 
-        fine_repeated_camera_directions = repeat(camera_directions, 'b nv nr d -> b nv nr np d', np=self.n_samples * 2)
-        fine_repeated_camera_directions = rearrange(fine_repeated_camera_directions, 'b nv nr np d -> (b nv) nr np d')
-        fine_camera_points_homogeneous = rearrange(fine_camera_points_homogeneous, 'b nv nr np d -> (b nv) nr np d')
-        fine_features = rearrange(fine_features, 'b nv nr np d -> (b nv) nr np d')
+        fine_repeated_camera_directions = repeat(
+            camera_directions, 'b nv nr d -> b nv nr np d', np=self.n_samples * 2)
+        fine_repeated_camera_directions = rearrange(
+            fine_repeated_camera_directions, 'b nv nr np d -> (b nv) nr np d')
+        fine_camera_points_homogeneous = rearrange(
+            fine_camera_points_homogeneous, 'b nv nr np d -> (b nv) nr np d')
+        fine_features = rearrange(
+            fine_features, 'b nv nr np d -> (b nv) nr np d')
 
         fine_camera_points = fine_camera_points_homogeneous[..., :3]
 
-        fine_embedding = self.fine_embedding((fine_camera_points, fine_repeated_camera_directions, fine_features))
+        fine_embedding = self.fine_embedding(
+            (fine_camera_points, fine_repeated_camera_directions, fine_features))
         fine_chromacity, fine_density = self.fine_readout(fine_embedding)
 
-        fine_rgb, fine_depth, _ = MVVNeRFRenderer.volumetric_render(all_zs, fine_density, fine_chromacity)
+        fine_rgb, fine_depth, _ = MVVNeRFRenderer.volumetric_render(
+            all_zs, fine_density, fine_chromacity)
         return rgb, depth, fine_rgb, fine_depth
 
     def train_step(self, data):
@@ -177,7 +207,8 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
     tgt_intrinsic = tgt_intrinsic.astype(np.float32)
 
     image_shape = src_colors[0].shape[:2]
-    tgt_r_o, tgt_r_d = get_rays(image_shape[1], image_shape[0], tgt_camera_config['pose'], tgt_intrinsic)
+    tgt_r_o, tgt_r_d = get_rays(
+        image_shape[1], image_shape[0], tgt_camera_config['pose'], tgt_intrinsic)
     all_ray_os = np.reshape(tgt_r_o, (-1, 3))
     all_ray_ds = np.reshape(tgt_r_d, (-1, 3))
     all_rgbs = []
@@ -187,18 +218,22 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
 
     src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
     batched_features = model.encode(src_images)
-    batched_features = rearrange(batched_features, '(b n) h w c -> b n h w c', b=1)
+    batched_features = rearrange(
+        batched_features, '(b n) h w c -> b n h w c', b=1)
 
     for i in range(0, len(all_ray_os), model.n_rays_infer):
         rays_o = all_ray_os[i:i + model.n_rays_infer]
         rays_d = all_ray_ds[i:i + model.n_rays_infer]
-        nn_input = MVNeRFDataGenerator.get_input(src_images, src_camera_configs, rays_d, rays_o)
-        rgb, depth, fine_rgb, fine_depth = model.infer(nn_input, batched_features)
+        nn_input = MVNeRFDataGenerator.get_input(
+            src_images, src_camera_configs, rays_d, rays_o)
+        rgb, depth, fine_rgb, fine_depth = model.infer(
+            nn_input, batched_features)
         all_rgbs.append(fine_rgb.numpy())
         all_depths.append(fine_depth.numpy())
     all_rgbs = np.reshape(np.array(all_rgbs), (*image_shape, 3)) * 255
     all_rgbs = np.clip(all_rgbs, 0, 255).astype(np.uint8)
     all_depths = np.reshape(np.array(all_depths), (*image_shape, 1))
-    norm_depths = (all_depths - np.min(all_depths)) / (np.max(all_depths) - np.min(all_depths))
+    norm_depths = (all_depths - np.min(all_depths)) / \
+        (np.max(all_depths) - np.min(all_depths))
     all_depths = (norm_depths * 255).astype(np.uint8)
     return all_rgbs, all_depths

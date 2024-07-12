@@ -36,6 +36,7 @@ RUN pip install --no-cache-dir imageio
 RUN pip install --no-cache-dir msgpack colortrans
 RUN pip install --no-cache-dir fastapi uvicorn
 RUN pip install --no-cache-dir tensorflow-graphics
+RUN pip install --no-cache-dir ftfy regex
 
 # USER root
 # RUN add-apt-repository --remove ppa:vikoadi/ppa

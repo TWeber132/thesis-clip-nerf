@@ -82,6 +82,7 @@ def validate(nerf_renderer, tgt_color, valid_data):
 
 @hydra.main(version_base=None, config_path="configuration", config_name="nerf_1_view")
 def main(cfg: DictConfig) -> None:
+    # tf.config.run_functions_eagerly(True)
     logger.remove()
     logger.add(sys.stderr, level="INFO")
 
