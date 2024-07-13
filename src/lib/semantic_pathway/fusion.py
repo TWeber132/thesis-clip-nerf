@@ -13,38 +13,37 @@ from typing import Tuple
 
 class Fusion(tf.keras.layers.Layer):
 
-    def __init__(self, text_proj: tf.keras.layers.Dense = None):
+    def __init__(self, x2_proj: tf.keras.layers.Dense = None):
         super().__init__()
-        self.text_proj = text_proj
+        self.x2_proj = x2_proj
 
     @tf.function(input_signature=[tf.TensorSpec(shape=(None, None, None, None), dtype=tf.float32, name="image"),
                                   tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="text")])
-    def tile_text(self, image, text):
-        print("Fusion tile_text once")
-        if self.text_proj:
-            text = self.text_proj(text)
-        # Instead of torch:  text = tf.expand_dims(tf.expand_dims(text, axis=-1), axis=-1)
+    def tile_x2(self, x1, x2):
+        if self.x2_proj:
+            x2 = self.x2_proj(x2)
+        # Instead of torch:  x2 = tf.expand_dims(tf.expand_dims(x2, axis=-1), axis=-1)
         # And since tensorflow works in NHWC manner instead of NCHW like torch we would have to do:
-        # text = tf.expand_dims(tf.expand_dims(text, axis=1), axis=1)
-        text = tf.expand_dims(tf.expand_dims(text, axis=1), axis=1)
-        # Instead of torch:  text = text.repeat(image.shape[0], 1, image.shape[-2], image.shape[-1])
-        # which effecively is: text = text.repeat(image.shape[0], 1, image.shape[2], image.shape[3])
+        # x2 = tf.expand_dims(tf.expand_dims(x2, axis=1), axis=1)
+        x2 = tf.expand_dims(tf.expand_dims(x2, axis=1), axis=1)
+        # Instead of torch:  x2 = x2.repeat(x1.shape[0], 1, x1.shape[-2], x1.shape[-1])
+        # which effecively is: x2 = x2.repeat(x1.shape[0], 1, x1.shape[2], x1.shape[3])
         #                                            ax0,       ax1,        ax2,            ax3
         # And since tensorflow works in NHWC manner instead of NCHW like torch we would have to do:
-        # text = text.repeat(image.shape[0], image.shape[1], image.shape[2], 1)
-        text = tf.repeat(text, repeats=tf.shape(image)[0], axis=0)
-        text = tf.repeat(text, repeats=tf.shape(image)[1], axis=1)
-        text = tf.repeat(text, repeats=tf.shape(image)[2], axis=2)
-        return text
+        # x2 = x2.repeat(x1.shape[0], x1.shape[1], x1.shape[2], 1)
+        x2 = tf.repeat(x2, repeats=tf.shape(x1)[0], axis=0)
+        x2 = tf.repeat(x2, repeats=tf.shape(x1)[1], axis=1)
+        x2 = tf.repeat(x2, repeats=tf.shape(x1)[2], axis=2)
+        return x2
 
     @tf.function(input_signature=[(tf.TensorSpec(shape=(None, None, None, None), dtype=tf.float32, name="image"),
                                    tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="text"))])
     def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]):
-        print("Fusion notimpl once")
         raise NotImplementedError()
 
 
 class FusionMult(Fusion):
+    """ x1 * x2 """
 
     def __init__(self, text_proj: tf.keras.layers.Dense = None):
         super(FusionMult, self).__init__(text_proj=text_proj)
@@ -52,8 +51,40 @@ class FusionMult(Fusion):
     @tf.function(input_signature=[(tf.TensorSpec(shape=(None, None, None, None), dtype=tf.float32, name="image"),
                                    tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="text"))])
     def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]):
-        print("FusionMult once")
-        image, text = inputs
-        if image.shape != text.shape and len(image.shape) != len(text.shape):
-            text = self.tile_text(image, text)
-        return image * text
+        x1, x2 = inputs
+        if x1.shape != x2.shape and len(x1.shape) != len(x2.shape):
+            x2 = self.tile_x2(x1, x2)
+        return x1 * x2
+
+
+class FusionAdd(Fusion):
+    """ x1 + x2 """
+
+    def __init__(self, x2_proj: tf.keras.layers.Dense = None):
+        super(FusionAdd, self).__init__(x2_proj=x2_proj)
+
+    def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]):
+        x1, x2 = inputs
+        if tf.shape(x1) != tf.shape(x2) and len(tf.shape(x1)) != len(tf.shape(x2)):
+            x2 = self.tile_x2(x1, x2)
+        return x1 + x2
+
+
+class FusionConv(Fusion):
+    """ 1x1 convs after [x1; x2] """
+
+    def __init__(self, x2_proj: tf.keras.layers.Dense = None, filters: int = 3):
+        super(FusionConv, self).__init__(x2_proj=x2_proj)
+        self.conv = tf.keras.Sequential([
+            tf.keras.layers.ReLU(),
+            tf.keras.layers.Conv2D(filters=filters,
+                                   kernel_size=1,
+                                   use_bias=False)])
+
+    def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]):
+        x1, x2 = inputs
+        if x1.shape != x2.shape and len(x1.shape) != len(x2.shape):
+            x2 = self.tile_x2(x1, x2)
+        x = tf.concat([x1, x2], axis=-1)    # [B, H, W, 2C]
+        x = self.conv(x)                    # [B, H, W, C]
+        return x

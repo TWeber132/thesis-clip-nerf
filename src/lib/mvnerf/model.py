@@ -10,6 +10,8 @@ from .nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_project
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
 from lib.clip.main import load_clip
 from lib.clip.utils import preprocess_tf
+from lib.unet.model_parts import Down, Up
+from lib.semantic_pathway.fusion import FusionConv
 
 
 class MVVNeRFRenderer(tf.keras.Model):
@@ -30,6 +32,18 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.clip_visual_features = load_clip().visual
         self.clip_visual_features.trainable = False
+        self.down_512 = Down(filters=512)
+        self.down_1024 = Down(filters=1024)
+        self.fusion_256 = FusionConv(filters=256)
+        self.fusion_512 = FusionConv(filters=512)
+        self.fusion_1024 = FusionConv(filters=1024)
+        self.up_512 = Up(filters=256, in_filters=512)
+        self.up_1024 = tf.keras.Sequential([
+            Up(filters=512, in_filters=1024),
+            Up(filters=256, in_filters=512)])
+        self.conv = tf.keras.layers.Conv2D(filters=256,
+                                           kernel_size=1,
+                                           use_bias=False)
 
         self.n_samples = n_samples
         self.n_rays_train = n_rays_train
@@ -55,18 +69,46 @@ class MVVNeRFRenderer(tf.keras.Model):
         src_images = inputs[2]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
 
+        # Combine CLIP and VISUAL
         clip_images = preprocess_tf(src_images)
-        clip_features = self.clip_visual_features(clip_images)
-        print(tf.shape(clip_features[0]))
-        # print(tf.shape(clip_features[1]))
-        # print(tf.shape(clip_features[2]))
-        # print(tf.shape(clip_features[3]))
+        clip_outputs = self.clip_visual_features(clip_images)
+        _clip_features = clip_outputs[0]                # [B 1024]
+        clip_256 = clip_outputs[1]                      # [B 56 56 256]
+        clip_512 = clip_outputs[2]                      # [B 28 28 512]
+        clip_1024 = clip_outputs[3]                     # [B 14 14 1024]
 
-        batched_features = self.encode(src_images)
-        # print(tf.shape(batched_features))
-        batched_features = rearrange(
-            batched_features, '(b n) h w c -> b n h w c', b=self.batch_size)
-        return self._call(inputs, self.n_rays_train, self.batch_size, batched_features)
+        visual_features = self.encode(src_images)       # [B 480 640 256]
+        visual_512 = self.down_512(visual_features)     # [B 240 320 512]
+        visual_1024 = self.down_1024(visual_512)        # [B 120 160 1024]
+
+        clip_256r = tf.image.resize(clip_256,           # [B 480 640 256]
+                                    size=[480, 640],
+                                    method='bicubic')
+        clip_512r = tf.image.resize(clip_512,           # [B 240 320 512]
+                                    size=[int(480 / 2), int(640 / 2)],
+                                    method='bicubic')
+        clip_1024r = tf.image.resize(clip_1024,         # [B 120 160 1024]
+                                     size=[int(480 / 4), int(640 / 4)],
+                                     method='bicubic')
+
+        fused_256 = self.fusion_256(                    # [B 480 640 256]
+            [visual_features, clip_256r])
+        fused_512 = self.fusion_512(                    # [B 240 320 512]
+            [visual_512, clip_512r])
+        fused_1024 = self.fusion_1024(                  # [B 120 160 1024]
+            [visual_1024, clip_1024r])
+
+        fused_256_512 = self.up_512(fused_512)          # [B 480 640 256]
+        fused_256_1024 = self.up_1024(fused_1024)       # [B 480 640 256]
+
+        fusion = tf.concat([fused_256,                  # [B 480 640 3*256]
+                            fused_256_512,
+                            fused_256_1024], axis=-1)
+        fusion = self.conv(fusion)
+
+        visual_features = rearrange(
+            fusion, '(b n) h w c -> b n h w c', b=self.batch_size)
+        return self._call(inputs, self.n_rays_train, self.batch_size, visual_features)
 
     @staticmethod
     def volumetric_render(zs, density, chromacity):

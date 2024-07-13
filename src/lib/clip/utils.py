@@ -37,13 +37,16 @@ def preprocess_tf(images: tf.Tensor, to_size: int = 224, normalize: bool = False
 
     # Normalize
     if normalize:
-        color_mean = tf.constant(
-            [0.48145466, 0.4578275, 0.40821073], dtype=tf.float32)
-        color_std = tf.constant(
-            [0.26862954, 0.26130258, 0.27577711], dtype=tf.float32)
         images = tf.math.divide(images, 255.0)
-        images = tf.math.subtract(images, color_mean)
-        images = tf.math.divide(images, color_std)
+
+    # Standardize
+    color_mean = tf.constant(
+        [0.48145466, 0.4578275, 0.40821073], dtype=tf.float32)
+    color_std = tf.constant(
+        [0.26862954, 0.26130258, 0.27577711], dtype=tf.float32)
+
+    images = tf.math.subtract(images, color_mean)
+    images = tf.math.divide(images, color_std)
     return images
 
 
