@@ -112,6 +112,7 @@ def main(cfg: DictConfig) -> None:
 
     nerf_renderer = MVVNeRFRenderer(**cfg.nerf_model,
                                     batch_size=cfg.nerf_training.batch_size)
+
     nerf_renderer(train_data_generator[0][0])
     compile_model(nerf_renderer)
 

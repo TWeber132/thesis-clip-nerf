@@ -32,15 +32,14 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.clip_visual_features = load_clip().visual
         self.clip_visual_features.trainable = False
-        self.down_512 = Down(filters=512)
-        self.down_1024 = Down(filters=1024)
-        self.fusion_256 = FusionConv(filters=256)
-        self.fusion_512 = FusionConv(filters=512)
-        self.fusion_1024 = FusionConv(filters=1024)
-        self.up_512 = Up(filters=256, in_filters=512)
-        self.up_1024 = tf.keras.Sequential([
-            Up(filters=512, in_filters=1024),
-            Up(filters=256, in_filters=512)])
+        self.down_512 = Down(filters=512, name="down_512")
+        self.down_1024 = Down(filters=1024, name="down_1024")
+        self.fusion_256 = FusionConv(filters=256, name="fusion_conv_256")
+        self.fusion_512 = FusionConv(filters=512, name="fusion_conv_512")
+        self.fusion_1024 = FusionConv(filters=1024, name="fusion_conv_1024")
+        self.up_512 = Up(filters=256, in_filters=512, name="up_512")
+        self.up_1024_1 = Up(filters=512, in_filters=1024, name="up_1024_1")
+        self.up_1024_2 = Up(filters=256, in_filters=512, name="up_1024_2")
         self.conv = tf.keras.layers.Conv2D(filters=256,
                                            kernel_size=1,
                                            use_bias=False)
@@ -57,14 +56,35 @@ class MVVNeRFRenderer(tf.keras.Model):
         self.near = near
         self.far = far
 
+    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 480, 640, 3), dtype=tf.float32, name="images")])
     def encode(self, image):
         features = self.visual_features(image)
         return features
 
+    @tf.function(input_signature=[(tf.TensorSpec(shape=(None, 512, 3), dtype=tf.float32, name="ray_origins"),
+                                   tf.TensorSpec(
+                                       shape=(None, 512, 3), dtype=tf.float32, name="ray_directions"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 480, 640, 3), dtype=tf.float32, name="images"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 4, 4), dtype=tf.float32, name="intrinsics"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 4, 4), dtype=tf.float32, name="extrinsics_inv")),
+                                  tf.TensorSpec(shape=(None, None, 480, 640, 256), dtype=tf.float32, name="combined_features")])
     def infer(self, inputs, batched_features):
         # TODO n_rays_infer should come from outside ...
         return self._call(inputs, self.n_rays_infer, self.infer_batch_size, batched_features)
 
+    @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 512, 3), dtype=tf.float32, name="ray_origins"),
+                                   tf.TensorSpec(
+                                       shape=(None, 512, 3), dtype=tf.float32, name="ray_directions"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 480, 640, 3), dtype=tf.float32, name="images"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 4, 4), dtype=tf.float32, name="intrinsics"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 4, 4), dtype=tf.float32, name="extrinsics_inv")),
+                                   tf.TensorSpec(shape=(), dtype=tf.bool, name="training")])
     def call(self, inputs, training=False, mask=None):
         src_images = inputs[2]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
@@ -72,45 +92,88 @@ class MVVNeRFRenderer(tf.keras.Model):
         # Combine CLIP and VISUAL
         clip_images = preprocess_tf(src_images)
         clip_outputs = self.clip_visual_features(clip_images)
-        _clip_features = clip_outputs[0]                # [B 1024]
-        clip_256 = clip_outputs[1]                      # [B 56 56 256]
-        clip_512 = clip_outputs[2]                      # [B 28 28 512]
-        clip_1024 = clip_outputs[3]                     # [B 14 14 1024]
+        visual_features = self.encode(src_images)
+        combined_features = self.combine_clip_visual_features_trivial(
+            clip_outputs, visual_features)
 
-        visual_features = self.encode(src_images)       # [B 480 640 256]
-        visual_512 = self.down_512(visual_features)     # [B 240 320 512]
-        visual_1024 = self.down_1024(visual_512)        # [B 120 160 1024]
+        combined_features = rearrange(
+            combined_features, '(b n) h w c -> b n h w c', b=self.batch_size)
+        return self._call(inputs, self.n_rays_train, self.batch_size, combined_features)
 
-        clip_256r = tf.image.resize(clip_256,           # [B 480 640 256]
+    @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+                                   tf.TensorSpec(
+                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+                                   tf.TensorSpec(
+                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+                                   tf.TensorSpec(
+                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+                                   tf.TensorSpec(
+                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+                                   tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
+    def combine_clip_visual_features_complex(self, clip_outputs, visual_features):
+        _clip_features = clip_outputs[0]                # [(BN) 1024]
+        clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+        clip_512 = clip_outputs[2]                      # [(BN) 28 28 512]
+        clip_1024 = clip_outputs[3]                     # [(BN) 14 14 1024]
+        _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
+
+        visual_512 = self.down_512(visual_features)     # [(BN) 240 320 512]
+        visual_1024 = self.down_1024(visual_512)        # [(BN) 120 160 1024]
+
+        clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
                                     size=[480, 640],
                                     method='bicubic')
-        clip_512r = tf.image.resize(clip_512,           # [B 240 320 512]
+        clip_512r = tf.image.resize(clip_512,           # [(BN) 240 320 512]
                                     size=[int(480 / 2), int(640 / 2)],
                                     method='bicubic')
-        clip_1024r = tf.image.resize(clip_1024,         # [B 120 160 1024]
+        clip_1024r = tf.image.resize(clip_1024,         # [(BN) 120 160 1024]
                                      size=[int(480 / 4), int(640 / 4)],
                                      method='bicubic')
 
-        fused_256 = self.fusion_256(                    # [B 480 640 256]
+        fused_256 = self.fusion_256(                    # [(BN) 480 640 256]
             [visual_features, clip_256r])
-        fused_512 = self.fusion_512(                    # [B 240 320 512]
+        fused_512 = self.fusion_512(                    # [(BN) 240 320 512]
             [visual_512, clip_512r])
-        fused_1024 = self.fusion_1024(                  # [B 120 160 1024]
+        fused_1024 = self.fusion_1024(                  # [(BN) 120 160 1024]
             [visual_1024, clip_1024r])
 
-        fused_256_512 = self.up_512(fused_512)          # [B 480 640 256]
-        fused_256_1024 = self.up_1024(fused_1024)       # [B 480 640 256]
+        fused_256_512 = self.up_512(fused_512)          # [(BN) 480 640 256]
+        fused_256_1024 = self.up_1024_2(                # [(BN) 480 640 256]
+            self.up_1024_1(fused_1024))
 
-        fusion = tf.concat([fused_256,                  # [B 480 640 3*256]
+        fusion = tf.concat([fused_256,                  # [(BN) 480 640 3*256]
                             fused_256_512,
                             fused_256_1024], axis=-1)
-        fusion = self.conv(fusion)
+        fusion = self.conv(fusion)                      # [(BN) 480 640 256]
+        return fusion
 
-        visual_features = rearrange(
-            fusion, '(b n) h w c -> b n h w c', b=self.batch_size)
-        return self._call(inputs, self.n_rays_train, self.batch_size, visual_features)
+    @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+                                   tf.TensorSpec(
+                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+                                   tf.TensorSpec(
+                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+                                   tf.TensorSpec(
+                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+                                   tf.TensorSpec(
+                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+                                   tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
+    def combine_clip_visual_features_trivial(self, clip_outputs, visual_features):
+        _clip_features = clip_outputs[0]                # [(BN) 1024]
+        clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+        _clip_512 = clip_outputs[2]                     # [(BN) 28 28 512]
+        _clip_1024 = clip_outputs[3]                    # [(BN) 14 14 1024]
+        _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
 
-    @staticmethod
+        clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
+                                    size=[480, 640],
+                                    method='bicubic')
+
+        fusion = tf.concat([clip_256r,                  # [(BN) 480 640 2*256]
+                            visual_features], axis=-1)
+        fusion = self.conv(fusion)                      # [(BN) 480 640 256]
+        return fusion
+
+    @ staticmethod
     def volumetric_render(zs, density, chromacity):
         dists = zs[..., 1:] - zs[..., :-1]
         dists = tf.concat([dists, dists[..., -1:]], axis=-1)
@@ -123,7 +186,18 @@ class MVVNeRFRenderer(tf.keras.Model):
         depth = tf.reduce_sum(weights * zs, axis=-1)
         return rgb, depth, weights
 
-    def _call(self, inputs, n_rays, batch_size, batched_features):
+    @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 512, 3), dtype=tf.float32, name="ray_origins"),
+                                   tf.TensorSpec(
+                                       shape=(None, 512, 3), dtype=tf.float32, name="ray_directions"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 480, 640, 3), dtype=tf.float32, name="images"),
+                                   tf.TensorSpec(
+                                       shape=(None, None, 4, 4), dtype=tf.float32, name="intrinsics"),
+                                   tf.TensorSpec(shape=(None, None, 4, 4), dtype=tf.float32, name="extrinsics_inv")),
+                                   tf.TensorSpec(shape=(), dtype=tf.int32, name="n_rays"), tf.TensorSpec(
+                                       shape=(), dtype=tf.int32, name="batch_size"),
+                                   tf.TensorSpec(shape=(None, None, 480, 640, 256), dtype=tf.float32, name="combined_features")])
+    def _call(self, inputs, n_rays, batch_size, combined_features):
         ray_origins = inputs[0]
         ray_directions = inputs[1]
         src_images = inputs[2]
@@ -139,7 +213,7 @@ class MVVNeRFRenderer(tf.keras.Model):
         pixel_locations, camera_points_homogeneous = compute_pixel_in_image_mv(world_points,
                                                                                src_intrinsics,
                                                                                src_extrinsics_inv)
-        features = get_projection_features_mv(normalized_images, batched_features, pixel_locations, n_rays,
+        features = get_projection_features_mv(normalized_images, combined_features, pixel_locations, n_rays,
                                               self.n_samples, batch_size)
         # transform rays direction from world to src camera coordinates
         camera_directions = world_to_camera_direction_vector_mv(
@@ -174,7 +248,7 @@ class MVVNeRFRenderer(tf.keras.Model):
         fine_pixel_locations, fine_camera_points_homogeneous = compute_pixel_in_image_mv(fine_points,
                                                                                          src_intrinsics,
                                                                                          src_extrinsics_inv)
-        fine_features = get_projection_features_mv(normalized_images, batched_features, fine_pixel_locations, n_rays,
+        fine_features = get_projection_features_mv(normalized_images, combined_features, fine_pixel_locations, n_rays,
                                                    self.n_samples * 2, batch_size)
 
         fine_repeated_camera_directions = repeat(
@@ -196,10 +270,13 @@ class MVVNeRFRenderer(tf.keras.Model):
             all_zs, fine_density, fine_chromacity)
         return rgb, depth, fine_rgb, fine_depth
 
+    @tf.function()
     def train_step(self, data):
         inputs, labels = data
+
         with tf.GradientTape() as tape:
-            rgb, depth, fine_rgb, fine_depth = self.call(inputs, training=True)
+            rgb, depth, fine_rgb, fine_depth = self.call(
+                inputs, training=True)
             loss = self.loss(labels, rgb) + self.loss(labels, fine_rgb)
         gradients = tape.gradient(loss, self.trainable_variables)
         optimize(self.optimizer, self.trainable_variables, gradients, 1.0)
@@ -259,9 +336,13 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
     src_images = np.array([[image[..., :3] / 255.0 for image in src_colors]])
 
     src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
-    batched_features = model.encode(src_images)
-    batched_features = rearrange(
-        batched_features, '(b n) h w c -> b n h w c', b=1)
+    visual_features = model.encode(src_images)
+    clip_images = preprocess_tf(src_images)
+    clip_features = model.clip_visual_features(clip_images)
+    combined_features = model.combine_clip_visual_features_trivial(
+        clip_features, visual_features)
+    combined_features = rearrange(
+        combined_features, '(b n) h w c -> b n h w c', b=1)
 
     for i in range(0, len(all_ray_os), model.n_rays_infer):
         rays_o = all_ray_os[i:i + model.n_rays_infer]
@@ -269,7 +350,7 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
         nn_input = MVNeRFDataGenerator.get_input(
             src_images, src_camera_configs, rays_d, rays_o)
         rgb, depth, fine_rgb, fine_depth = model.infer(
-            nn_input, batched_features)
+            nn_input, combined_features)
         all_rgbs.append(fine_rgb.numpy())
         all_depths.append(fine_depth.numpy())
     all_rgbs = np.reshape(np.array(all_rgbs), (*image_shape, 3)) * 255

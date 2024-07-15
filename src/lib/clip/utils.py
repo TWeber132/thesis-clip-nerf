@@ -22,7 +22,7 @@ def preprocess(image: np.ndarray, to_size: int = 224) -> np.ndarray:
     return img_norm
 
 
-@tf.function(input_signature=[tf.TensorSpec(shape=(None, 480, 640, 3), dtype=tf.float32, name="image")])
+@tf.function(input_signature=[tf.TensorSpec(shape=(None, 480, 640, 3), dtype=tf.float32, name="images")])
 def preprocess_tf(images: tf.Tensor, to_size: int = 224, normalize: bool = False) -> tf.Tensor:
     # Resize and crop
     h = tf.shape(images)[1]

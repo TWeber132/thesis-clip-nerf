@@ -33,13 +33,13 @@ class MVNeRFDataGenerator(DataGenerator):
             src_extrinsic_invs.append(src_extrinsic_inv)
             src_intrinsics.append(src_intrinsic)
 
-        inputs = [
+        inputs = (
             np.array([r_o], dtype=np.float32),
             np.array([r_d], dtype=np.float32),
             np.array([np.array(colors) / 255.0], dtype=np.float32),
             np.array([src_intrinsics], dtype=np.float32),
             np.array([src_extrinsic_invs], dtype=np.float32)
-        ]
+        )
         return inputs
 
     @staticmethod
@@ -90,11 +90,11 @@ class MVNeRFDataGenerator(DataGenerator):
 
             targets.append(target_rgbs)
 
-        inputs = [
+        inputs = (
             np.array(rays_origins, dtype=np.float32),
             np.array(rays_directions, dtype=np.float32),
             np.array(src_images, dtype=np.float32),
             np.array(src_intrinsics, dtype=np.float32),
             np.array(src_extrinsics_inv, dtype=np.float32)
-        ]
+        )
         return inputs, np.array(targets)

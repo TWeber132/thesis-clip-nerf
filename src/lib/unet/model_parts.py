@@ -12,31 +12,33 @@ import tensorflow as tf
 class DoubleConv(tf.keras.layers.Layer):
     """(convolution => [BN] => ReLU) * 2"""
 
-    def __init__(self, filters, mid_filters=None):
-        super().__init__()
+    def __init__(self, filters, mid_filters=None, name="double_conv"):
+        super().__init__(name=name)
         if not mid_filters:
             mid_filters = filters
-        self.double_conv = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(
-                mid_filters, kernel_size=3, padding='same', use_bias=False),
-            tf.keras.layers.BatchNormalization(epsilon=1e-5),
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Conv2D(
-                filters, kernel_size=3, padding='same', use_bias=False),
-            tf.keras.layers.BatchNormalization(epsilon=1e-5),
-            tf.keras.layers.ReLU()])
+        self.conv_1 = tf.keras.layers.Conv2D(
+            mid_filters, kernel_size=3, padding='same', use_bias=False)
+        self.bn_1 = tf.keras.layers.BatchNormalization(epsilon=1e-5)
+        self.relu_1 = tf.keras.layers.ReLU()
+        self.conv_2 = tf.keras.layers.Conv2D(
+            filters, kernel_size=3, padding='same', use_bias=False)
+        self.bn_2 = tf.keras.layers.BatchNormalization(epsilon=1e-5)
+        self.relu_2 = tf.keras.layers.ReLU()
 
     @tf.function(reduce_retracing=True)
     def call(self, x):
+        tf.print("tracing ... ")
         print("DoubleConv once")
-        return self.double_conv(x)
+        x = self.relu_1(self.bn_1(self.conv_1(x)))
+        x = self.relu_2(self.bn_2(self.conv_2(x)))
+        return x
 
 
 class Up(tf.keras.layers.Layer):
     """Upscaling then double conv"""
 
-    def __init__(self, filters, in_filters, bilinear=True):
-        super().__init__()
+    def __init__(self, filters, in_filters, bilinear=True, name="up"):
+        super().__init__(name=name)
 
         # if bilinear, use the normal convolutions to reduce the number of channels
         if bilinear:
@@ -90,13 +92,12 @@ class Up(tf.keras.layers.Layer):
 class Down(tf.keras.layers.Layer):
     """Downscaling with maxpool then double conv"""
 
-    def __init__(self, filters):
-        super().__init__()
-        self.maxpool_conv = tf.keras.Sequential([
-            tf.keras.layers.MaxPool2D(pool_size=2),
-            DoubleConv(filters)]
-        )
+    def __init__(self, filters, name="down"):
+        super().__init__(name=name)
+        self.maxpool = tf.keras.layers.MaxPool2D(pool_size=2)
+        self.double_conv = DoubleConv(filters)
 
     @tf.function(reduce_retracing=True)
     def call(self, x):
-        return self.maxpool_conv(x)
+        x = self.maxpool(x)
+        return self.double_conv(x)

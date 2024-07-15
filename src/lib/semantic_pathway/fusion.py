@@ -13,8 +13,8 @@ from typing import Tuple
 
 class Fusion(tf.keras.layers.Layer):
 
-    def __init__(self, x2_proj: tf.keras.layers.Dense = None):
-        super().__init__()
+    def __init__(self, x2_proj: tf.keras.layers.Dense = None, name="fusion"):
+        super().__init__(name=name)
         self.x2_proj = x2_proj
 
     @tf.function(input_signature=[tf.TensorSpec(shape=(None, None, None, None), dtype=tf.float32, name="image"),
@@ -45,8 +45,8 @@ class Fusion(tf.keras.layers.Layer):
 class FusionMult(Fusion):
     """ x1 * x2 """
 
-    def __init__(self, text_proj: tf.keras.layers.Dense = None):
-        super(FusionMult, self).__init__(text_proj=text_proj)
+    def __init__(self, text_proj: tf.keras.layers.Dense = None, name="fusion_mult"):
+        super(FusionMult, self).__init__(text_proj=text_proj, name=name)
 
     @tf.function(input_signature=[(tf.TensorSpec(shape=(None, None, None, None), dtype=tf.float32, name="image"),
                                    tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="text"))])
@@ -60,9 +60,10 @@ class FusionMult(Fusion):
 class FusionAdd(Fusion):
     """ x1 + x2 """
 
-    def __init__(self, x2_proj: tf.keras.layers.Dense = None):
-        super(FusionAdd, self).__init__(x2_proj=x2_proj)
+    def __init__(self, x2_proj: tf.keras.layers.Dense = None, name="fusion_add"):
+        super(FusionAdd, self).__init__(x2_proj=x2_proj, name=name)
 
+    @tf.function(reduce_retracing=True)
     def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]):
         x1, x2 = inputs
         if tf.shape(x1) != tf.shape(x2) and len(tf.shape(x1)) != len(tf.shape(x2)):
@@ -73,18 +74,18 @@ class FusionAdd(Fusion):
 class FusionConv(Fusion):
     """ 1x1 convs after [x1; x2] """
 
-    def __init__(self, x2_proj: tf.keras.layers.Dense = None, filters: int = 3):
-        super(FusionConv, self).__init__(x2_proj=x2_proj)
-        self.conv = tf.keras.Sequential([
-            tf.keras.layers.ReLU(),
-            tf.keras.layers.Conv2D(filters=filters,
-                                   kernel_size=1,
-                                   use_bias=False)])
+    def __init__(self, x2_proj: tf.keras.layers.Dense = None, filters: int = 3, name="fusion_conv"):
+        super(FusionConv, self).__init__(x2_proj=x2_proj, name=name)
+        self.conv = tf.keras.layers.Conv2D(
+            filters=filters, kernel_size=1, use_bias=False)
+        self.relu = tf.keras.layers.ReLU()
 
+    @tf.function(reduce_retracing=True)
     def call(self, inputs: Tuple[tf.Tensor, tf.Tensor]):
         x1, x2 = inputs
         if x1.shape != x2.shape and len(x1.shape) != len(x2.shape):
             x2 = self.tile_x2(x1, x2)
         x = tf.concat([x1, x2], axis=-1)    # [B, H, W, 2C]
+        x = self.relu(x)
         x = self.conv(x)                    # [B, H, W, C]
         return x
