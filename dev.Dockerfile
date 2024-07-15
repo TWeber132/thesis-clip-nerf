@@ -26,17 +26,17 @@ RUN DEBIAN_FRONTEND=noninteractive \
 	apt update && \
 	apt install -y mesa-utils libgl1-mesa-glx libglu1-mesa-dev freeglut3-dev mesa-common-dev libopencv-dev python3-opencv python3-tk
 RUN /usr/bin/python3 -m pip install --upgrade pip
-RUN pip install --no-cache-dir opencv-contrib-python
-RUN pip install --no-cache-dir transforms3d tensorflow_addons
-RUN pip install --no-cache-dir scipy numpy
-RUN pip install --no-cache-dir scikit-learn einops
-RUN pip install --upgrade tensorflow-probability
-RUN pip install --no-cache-dir wandb pandas
-RUN pip install --no-cache-dir imageio
-RUN pip install --no-cache-dir msgpack colortrans
-RUN pip install --no-cache-dir fastapi uvicorn
-RUN pip install --no-cache-dir tensorflow-graphics
-RUN pip install --no-cache-dir ftfy regex
+RUN /usr/bin/python3 -m pip install --no-cache-dir opencv-contrib-python
+RUN /usr/bin/python3 -m pip install --no-cache-dir transforms3d tensorflow_addons
+RUN /usr/bin/python3 -m pip install --no-cache-dir scipy numpy
+RUN /usr/bin/python3 -m pip install --no-cache-dir scikit-learn einops
+RUN /usr/bin/python3 -m pip install --upgrade tensorflow-probability
+RUN /usr/bin/python3 -m pip install --no-cache-dir wandb pandas
+RUN /usr/bin/python3 -m pip install --no-cache-dir imageio
+RUN /usr/bin/python3 -m pip install --no-cache-dir msgpack colortrans
+RUN /usr/bin/python3 -m pip install --no-cache-dir fastapi uvicorn
+RUN /usr/bin/python3 -m pip install --no-cache-dir tensorflow-graphics
+RUN /usr/bin/python3 -m pip install --no-cache-dir ftfy regex
 
 # USER root
 # RUN add-apt-repository --remove ppa:vikoadi/ppa

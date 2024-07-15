@@ -4,5 +4,5 @@
 ##############################################################################
 docker build \
   -f kubeflow.Dockerfile \
-  -t gergelysoti/tf-jupyter-nerf:2024-2-0.7 .
+  -t thesis/kubeflow-jupyter-tensorflow-full:v1.9.0-rc.2 .
 
