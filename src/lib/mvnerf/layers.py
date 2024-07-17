@@ -489,3 +489,36 @@ class CombineCLIPVisual(tf.keras.layers.Layer):
         x = self.conv(x)                            # [(BN) 240 320 256]
         x = self.up(x)                              # [(BN) 480 640 256]
         return x
+
+
+class CombineCLIPVisualLegacy(tf.keras.layers.Layer):
+    def __init__(self, name="combine_clip_visual_legacy"):
+        super().__init__(name=name)
+
+    @ tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+                                   tf.TensorSpec(
+                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+                                   tf.TensorSpec(
+                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+                                   tf.TensorSpec(
+                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+                                   tf.TensorSpec(
+                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+                                   tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features"))])
+    def call(self, inputs):
+        clip_outputs = inputs[0]
+        visual_features = inputs[1]
+        _clip_features = clip_outputs[0]                # [(BN) 1024]
+        clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+        _clip_512 = clip_outputs[2]                     # [(BN) 28 28 512]
+        _clip_1024 = clip_outputs[3]                    # [(BN) 14 14 1024]
+        _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
+
+        clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
+                                    size=[480, 640],
+                                    method='bicubic')
+
+        fusion = tf.concat([clip_256r,                  # [(BN) 480 640 2*256]
+                            visual_features], axis=-1)
+        fusion = self.conv(fusion)                      # [(BN) 480 640 256]
+        return fusion
