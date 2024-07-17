@@ -2,7 +2,7 @@
 ##                                 Base Image                               ##
 ##############################################################################
 ARG RENDER=base
-FROM tensorflow/tensorflow:2.15.0-gpu as tf-base
+FROM tensorflow/tensorflow:2.11.0-gpu as tf-base
 USER root
 ENV TZ=Europe/Berlin
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone

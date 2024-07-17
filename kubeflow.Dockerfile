@@ -1,7 +1,7 @@
 ##############################################################################
 ##                                 Base Image                               ##
 ##############################################################################
-FROM kubeflownotebookswg/jupyter-tensorflow-full:v1.9.0-rc.2 as kubeflow-base
+FROM kubeflownotebookswg/jupyter-tensorflow-cuda-full:v1.9.0-rc.2 as kubeflow-base
 ##############################################################################
 ##                                 Dependencies                             ##
 ##############################################################################
@@ -25,7 +25,6 @@ RUN pip install --no-cache-dir fastapi uvicorn
 RUN pip install --no-cache-dir matplotlib
 RUN pip install --upgrade hydra-core 
 RUN pip install --no-cache-dir tensorflow-graphics --no-deps
-RUN pip install --no-cache-dir opencv-python
 RUN pip install --no-cache-dir loguru
 RUN pip install --no-cache-dir ftfy regex
 
