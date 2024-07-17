@@ -3,6 +3,7 @@ import numpy as np
 from lib.mvnerf.nerf_utils import position_encoding
 from einops import rearrange
 
+
 class Block(tf.keras.layers.Layer):
     def __init__(self, n_features, downsample=None, **kwargs):
         super(Block, self).__init__(**kwargs)
@@ -243,8 +244,8 @@ class VisualFeatures(tf.keras.Model):
         self.transformer_upscale = tf.keras.layers.Resizing(original_image_size[0] // 2, original_image_size[1] // 2,
                                                             interpolation='bilinear')
 
-        #self.feature_upsample = tf.keras.layers.UpSampling2D(
-            #size=(2, 2), interpolation='bilinear')
+        # self.feature_upsample = tf.keras.layers.UpSampling2D(
+        # size=(2, 2), interpolation='bilinear')
 
     def call(self, inputs, training=False, mask=None):
         # b h w c
@@ -254,7 +255,7 @@ class VisualFeatures(tf.keras.Model):
         latents = self.transformer_upscale(latents)
         skip_latents = self.conv_features(inputs)
         features = tf.concat([latents, skip_latents], axis=-1)
-        #features = self.feature_upsample(features)
+        # features = self.feature_upsample(features)
         return features
 
 
@@ -409,26 +410,28 @@ class Readout(tf.keras.Model):
         output = self.output_layer(output)
         return output
 
+
 class Level(tf.keras.layers.Layer):
     def __init__(self, downscale=1, vis_size=(240, 320), filters=256, name="level"):
         super().__init__(name=name)
         self.vis_size = vis_size
         self.filters = filters
-        
+
         self.resize_down = tf.keras.layers.Resizing(
-            vis_size[0] // downscale, 
+            vis_size[0] // downscale,
             vis_size[1] // downscale,
             interpolation='bilinear')
         self.resize_up = tf.keras.layers.Resizing(
-            vis_size[0], 
+            vis_size[0],
             vis_size[1],
             interpolation='bilinear')
         self.pre_conv = tf.keras.layers.Conv2D(filters=filters,
-                                           kernel_size=1,
-                                           use_bias=False)
+                                               kernel_size=1,
+                                               use_bias=False)
         self.post_conv = tf.keras.layers.Conv2D(filters=filters,
-                                           kernel_size=1,
-                                           use_bias=False)
+                                                kernel_size=1,
+                                                use_bias=False)
+
     @tf.function(reduce_retracing=True)
     def call(self, inputs):
         clip_x = inputs[0]
@@ -439,9 +442,8 @@ class Level(tf.keras.layers.Layer):
         x = tf.concat([clip_x, vis], axis=-1)
         x = self.resize_up(self.post_conv(x))
         return x
-        
-        
-    
+
+
 class CombineCLIPVisual(tf.keras.layers.Layer):
     def __init__(self, name="combine_clip_visual"):
         super().__init__(name=name)
@@ -470,20 +472,20 @@ class CombineCLIPVisual(tf.keras.layers.Layer):
                                    tf.TensorSpec(shape=(None, 240, 320, 256), dtype=tf.float32, name="visual_features"))])
     def call(self, inputs):
         clip_outputs = inputs[0]
-        vis = inputs[1]                                 # [(BN) 480 640 256]
-        _clip_features = clip_outputs[0]                # [(BN) 1024]
-        clip_1 = clip_outputs[1]                        # [(BN) 56 56 256]
-        clip_2 = clip_outputs[2]                        # [(BN) 28 28 512]
-        clip_3 = clip_outputs[3]                        # [(BN) 14 14 1024]
-        clip_4 = clip_outputs[4]                        # [(BN) 7 7 2048]
-        
-        x_level_1 = self.level_1((clip_1, vis)) # [(BN) 240 320 256]
-        x_level_2 = self.level_2((clip_2, vis)) # [(BN) 240 320 256]
-        x_level_3 = self.level_3((clip_3, vis)) # [(BN) 240 320 256]
-        x_level_4 = self.level_4((clip_4, vis)) # [(BN) 240 320 256]
+        vis = inputs[1]                             # [(BN) 480 640 256]
+        _clip_features = clip_outputs[0]            # [(BN) 1024]
+        clip_1 = clip_outputs[1]                    # [(BN) 56 56 256]
+        clip_2 = clip_outputs[2]                    # [(BN) 28 28 512]
+        clip_3 = clip_outputs[3]                    # [(BN) 14 14 1024]
+        clip_4 = clip_outputs[4]                    # [(BN) 7 7 2048]
 
-        x = tf.concat(                        # [(BN) 240 320 4*256]
+        x_level_1 = self.level_1((clip_1, vis))     # [(BN) 240 320 256]
+        x_level_2 = self.level_2((clip_2, vis))     # [(BN) 240 320 256]
+        x_level_3 = self.level_3((clip_3, vis))     # [(BN) 240 320 256]
+        x_level_4 = self.level_4((clip_4, vis))     # [(BN) 240 320 256]
+
+        x = tf.concat(                              # [(BN) 240 320 4*256]
             [x_level_1, x_level_2, x_level_3, x_level_4], axis=-1)
-        x = self.conv(x)                 # [(BN) 240 320 256]
-        x = self.up(x)                               # [(BN) 480 640 256]
+        x = self.conv(x)                            # [(BN) 240 320 256]
+        x = self.up(x)                              # [(BN) 480 640 256]
         return x

@@ -30,7 +30,7 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.clip_visual = load_clip().visual
         self.clip_visual.trainable = False
-        
+
         self.combine_clip_visual_features = CombineCLIPVisual()
 
         self.n_samples = n_samples
