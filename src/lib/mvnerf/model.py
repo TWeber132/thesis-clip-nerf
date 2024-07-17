@@ -30,7 +30,7 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.clip_visual_features = load_clip().visual
         self.clip_visual_features.trainable = False
-
+        
         self.combine_clip_visual_features = CombineCLIPVisual()
 
         self.n_samples = n_samples
@@ -84,7 +84,6 @@ class MVVNeRFRenderer(tf.keras.Model):
         visual_features = self.encode(src_images)
         combined_features = self.combine_clip_visual_features(
             (clip_outputs, visual_features))
-
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', b=self.batch_size)
         return self._call(inputs, self.n_rays_train, self.batch_size, combined_features)
@@ -378,7 +377,7 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
     visual_features = model.encode(src_images)
     clip_images = preprocess_tf(src_images)
     clip_features = model.clip_visual_features(clip_images)
-    combined_features = model.combine_clip_visual_features_trivial(
+    combined_features = model.combine_clip_visual_features_complex(
         clip_features, visual_features)
     combined_features = rearrange(
         combined_features, '(b n) h w c -> b n h w c', b=1)
