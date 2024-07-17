@@ -1,7 +1,8 @@
 import tensorflow as tf
 import numpy as np
-from .nerf_utils import position_encoding
+from lib.mvnerf.nerf_utils import position_encoding
 from einops import rearrange
+from lib.unet.model_parts import Down, Up
 
 
 class Block(tf.keras.layers.Layer):
@@ -39,11 +40,13 @@ class ConvolutionalEncoder(tf.keras.Model):
         super(ConvolutionalEncoder, self).__init__(**kwargs)
 
         downsample = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(n_features // 2, kernel_size=1, strides=1, padding='same', use_bias=False),
+            tf.keras.layers.Conv2D(
+                n_features // 2, kernel_size=1, strides=1, padding='same', use_bias=False),
             tf.keras.layers.BatchNormalization()
         ])
         self.conv_features = tf.keras.Sequential([
-            tf.keras.layers.Conv2D(64, kernel_size=7, padding='same', use_bias=False, strides=2),
+            tf.keras.layers.Conv2D(
+                64, kernel_size=7, padding='same', use_bias=False, strides=2),
             tf.keras.layers.BatchNormalization(),
             tf.keras.layers.ReLU(),
             Block(n_features // 2, downsample),
@@ -78,7 +81,8 @@ class TransformerBlock(tf.keras.layers.Layer):
 
         self.layer_norm_2 = tf.keras.layers.LayerNormalization()
         self.mlp = tf.keras.Sequential([
-            tf.keras.layers.Dense(embed_dim * mlp_ratio, activation='gelu', name=f'{self.name}/dense_0'),
+            tf.keras.layers.Dense(
+                embed_dim * mlp_ratio, activation='gelu', name=f'{self.name}/dense_0'),
             tf.keras.layers.Dense(embed_dim, name=f'{self.name}/dense_1')
         ])
 
@@ -109,13 +113,15 @@ class VisionTransformer(tf.keras.Model):
         self.grid_size = (img_size[0] // patch_size, img_size[1] // patch_size)
         num_patches = self.grid_size[0] * self.grid_size[1]
         # here might be a problem with batch size
-        self.cls_token = tf.Variable(tf.zeros([1, 1, embed_dim]), trainable=True, name='cls_token')
+        self.cls_token = tf.Variable(
+            tf.zeros([1, 1, embed_dim]), trainable=True, name='cls_token')
         embed_len = num_patches + 1
         self.pos_embedding = tf.Variable(tf.random.normal([1, embed_len, embed_dim]) * 0.02, trainable=True,
                                          name='pos_embedding')
 
         # TODO not really general ... need refactoring
-        feature_hooks = [hooks[0]] + [hooks[i] - hooks[i - 1] for i in range(1, len(hooks))]
+        feature_hooks = [hooks[0]] + [hooks[i] - hooks[i - 1]
+                                      for i in range(1, len(hooks))]
         self.transformer_blocks = [
             tf.keras.Sequential(
                 [TransformerBlock(num_heads, embed_dim, mlp_ratio, name=f't_block_{j * h + i}') for i in range(h)]) for
@@ -160,36 +166,50 @@ class VisionTransformerEncoder(tf.keras.Model):
                  **kwargs):
         super(VisionTransformerEncoder, self).__init__(**kwargs)
 
-        self.vit = VisionTransformer(img_size, patch_size, embed_dim, mlp_ratio, num_classes, hooks)
+        self.vit = VisionTransformer(
+            img_size, patch_size, embed_dim, mlp_ratio, num_classes, hooks)
         self.post_process_1 = tf.keras.Sequential([
             tf.keras.layers.Conv2D(features[0], kernel_size=1),
-            tf.keras.layers.Conv2DTranspose(features[0], kernel_size=4, strides=4)
+            tf.keras.layers.Conv2DTranspose(
+                features[0], kernel_size=4, strides=4)
         ])
         self.post_process_2 = tf.keras.Sequential([
             tf.keras.layers.Conv2D(features[1], kernel_size=1),
-            tf.keras.layers.Conv2DTranspose(features[1], kernel_size=2, strides=2)
+            tf.keras.layers.Conv2DTranspose(
+                features[1], kernel_size=2, strides=2)
         ])
-        self.post_process_3 = tf.keras.layers.Conv2D(features[2], kernel_size=1)
+        self.post_process_3 = tf.keras.layers.Conv2D(
+            features[2], kernel_size=1)
         self.post_process_4 = tf.keras.Sequential([
             tf.keras.layers.Conv2D(features[3], kernel_size=1),
-            tf.keras.layers.Conv2D(features[3], kernel_size=3, strides=2, padding='same')
+            tf.keras.layers.Conv2D(
+                features[3], kernel_size=3, strides=2, padding='same')
         ])
 
-        self.conv_decode_1 = tf.keras.layers.Conv2D(n_features, kernel_size=3, padding='same', use_bias=False)
-        self.conv_decode_2 = tf.keras.layers.Conv2D(n_features, kernel_size=3, padding='same', use_bias=False)
-        self.conv_decode_3 = tf.keras.layers.Conv2D(n_features, kernel_size=3, padding='same', use_bias=False)
-        self.conv_decode_4 = tf.keras.layers.Conv2D(n_features, kernel_size=3, padding='same', use_bias=False)
+        self.conv_decode_1 = tf.keras.layers.Conv2D(
+            n_features, kernel_size=3, padding='same', use_bias=False)
+        self.conv_decode_2 = tf.keras.layers.Conv2D(
+            n_features, kernel_size=3, padding='same', use_bias=False)
+        self.conv_decode_3 = tf.keras.layers.Conv2D(
+            n_features, kernel_size=3, padding='same', use_bias=False)
+        self.conv_decode_4 = tf.keras.layers.Conv2D(
+            n_features, kernel_size=3, padding='same', use_bias=False)
 
-        self.upsample_1 = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
-        self.upsample_2 = tf.keras.layers.UpSampling2D(size=(4, 4), interpolation='bilinear')
-        self.upsample_3 = tf.keras.layers.UpSampling2D(size=(8, 8), interpolation='bilinear')
-        self.upsample_4 = tf.keras.layers.UpSampling2D(size=(16, 16), interpolation='bilinear')
+        self.upsample_1 = tf.keras.layers.UpSampling2D(
+            size=(2, 2), interpolation='bilinear')
+        self.upsample_2 = tf.keras.layers.UpSampling2D(
+            size=(4, 4), interpolation='bilinear')
+        self.upsample_3 = tf.keras.layers.UpSampling2D(
+            size=(8, 8), interpolation='bilinear')
+        self.upsample_4 = tf.keras.layers.UpSampling2D(
+            size=(16, 16), interpolation='bilinear')
 
         self.output_conv = tf.keras.Sequential([
             tf.keras.layers.ReLU(),
             tf.keras.layers.Conv2D(n_features, kernel_size=3, padding='same'),
             tf.keras.layers.ReLU(),
-            tf.keras.layers.Conv2D(n_features // 2, kernel_size=3, padding='same')
+            tf.keras.layers.Conv2D(
+                n_features // 2, kernel_size=3, padding='same')
         ])
 
     def call(self, inputs, training=False, mask=None):
@@ -197,10 +217,14 @@ class VisionTransformerEncoder(tf.keras.Model):
         features = [rearrange(f[:, 1:], 'b (h w) c -> b h w c', h=self.vit.grid_size[0], w=self.vit.grid_size[1]) for f
                     in features]
         latents = tf.concat([
-            self.upsample_1(self.conv_decode_1(self.post_process_1(features[0]))),
-            self.upsample_2(self.conv_decode_2(self.post_process_2(features[1]))),
-            self.upsample_3(self.conv_decode_3(self.post_process_3(features[2]))),
-            self.upsample_4(self.conv_decode_4(self.post_process_4(features[3])))
+            self.upsample_1(self.conv_decode_1(
+                self.post_process_1(features[0]))),
+            self.upsample_2(self.conv_decode_2(
+                self.post_process_2(features[1]))),
+            self.upsample_3(self.conv_decode_3(
+                self.post_process_3(features[2]))),
+            self.upsample_4(self.conv_decode_4(
+                self.post_process_4(features[3])))
         ], axis=-1)
         latents = self.output_conv(latents)
         return latents
@@ -212,7 +236,8 @@ class VisualFeatures(tf.keras.Model):
 
         self.conv_features = ConvolutionalEncoder(n_features=n_features)
 
-        self.vision_transformer = VisionTransformerEncoder(n_features=n_features)
+        self.vision_transformer = VisionTransformerEncoder(
+            n_features=n_features)
 
         transformer_image_size = (224, 224)
         self.transformer_downscale = tf.keras.layers.Resizing(transformer_image_size[0], transformer_image_size[1],
@@ -220,7 +245,8 @@ class VisualFeatures(tf.keras.Model):
         self.transformer_upscale = tf.keras.layers.Resizing(original_image_size[0] // 2, original_image_size[1] // 2,
                                                             interpolation='bilinear')
 
-        self.feature_upsample = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
+        self.feature_upsample = tf.keras.layers.UpSampling2D(
+            size=(2, 2), interpolation='bilinear')
 
     def call(self, inputs, training=False, mask=None):
         # b h w c
@@ -239,8 +265,10 @@ class ResNetMLPBlock(tf.keras.layers.Layer):
                  kernel_initializer='glorot_uniform', **kwargs):
         super(ResNetMLPBlock, self).__init__(**kwargs)
 
-        self.layer_0 = tf.keras.layers.Dense(hidden_size, kernel_initializer=kernel_initializer)
-        self.layer_1 = tf.keras.layers.Dense(output_size, kernel_initializer=kernel_initializer)
+        self.layer_0 = tf.keras.layers.Dense(
+            hidden_size, kernel_initializer=kernel_initializer)
+        self.layer_1 = tf.keras.layers.Dense(
+            output_size, kernel_initializer=kernel_initializer)
 
         if activation == 'relu':
             self.prelu_0 = tf.keras.layers.ReLU()
@@ -252,7 +280,8 @@ class ResNetMLPBlock(tf.keras.layers.Layer):
             raise ValueError(f'activation {activation} not supported')
 
         if transform_shortcut:
-            self.shortcut = tf.keras.layers.Dense(output_size, use_bias=False, kernel_initializer=kernel_initializer)
+            self.shortcut = tf.keras.layers.Dense(
+                output_size, use_bias=False, kernel_initializer=kernel_initializer)
         else:
             self.shortcut = None
 
@@ -285,9 +314,11 @@ class ResNetMLPNeRFEmbedding(tf.keras.Model):
         self.complete_output = complete_output
 
     def call(self, inputs, training=False, mask=None):
-        encoded_pos = position_encoding(inputs[0], self.n_freq, self.pos_encoding_freq)
+        encoded_pos = position_encoding(
+            inputs[0], self.n_freq, self.pos_encoding_freq)
         if self.embed_direction_vector:
-            encoded_dir = position_encoding(inputs[1], self.n_freq, self.pos_encoding_freq)
+            encoded_dir = position_encoding(
+                inputs[1], self.n_freq, self.pos_encoding_freq)
         else:
             encoded_dir = inputs[1]
         x = tf.concat([encoded_pos, encoded_dir, inputs[2]], axis=-1)
@@ -322,9 +353,11 @@ class MVResNetMLPNeRFEmbedding(tf.keras.Model):
         self.complete_output = complete_output
 
     def call(self, inputs, training=False, mask=None):
-        encoded_pos = position_encoding(inputs[0], self.n_freq, self.pos_encoding_freq)
+        encoded_pos = position_encoding(
+            inputs[0], self.n_freq, self.pos_encoding_freq)
         if self.embed_direction_vector:
-            encoded_dir = position_encoding(inputs[1], self.n_freq, self.pos_encoding_freq)
+            encoded_dir = position_encoding(
+                inputs[1], self.n_freq, self.pos_encoding_freq)
         else:
             encoded_dir = inputs[1]
         x = tf.concat([encoded_pos, encoded_dir, inputs[2]], axis=-1)
@@ -333,7 +366,8 @@ class MVResNetMLPNeRFEmbedding(tf.keras.Model):
         for block in self.feature_blocks:
             outputs.append(block(outputs[-1]))
 
-        pre_fusion = rearrange(outputs[-1], '(b nv) nr np d -> b nv nr np d', nv=self.n_views)
+        pre_fusion = rearrange(
+            outputs[-1], '(b nv) nr np d -> b nv nr np d', nv=self.n_views)
         fusion = tf.reduce_mean(pre_fusion, axis=1)
         outputs.append(fusion)
 
@@ -352,7 +386,8 @@ class RenderReadout(tf.keras.Model):
         self.prelu = tf.keras.layers.ReLU()
         self.output_layer = tf.keras.layers.Dense(output_size)
 
-        self.softplus = tf.keras.layers.Activation(tf.keras.activations.softplus)
+        self.softplus = tf.keras.layers.Activation(
+            tf.keras.activations.softplus)
         self.sigmoid = tf.keras.layers.Activation(tf.keras.activations.sigmoid)
 
     def call(self, inputs, training=False, mask=None):
@@ -368,9 +403,88 @@ class Readout(tf.keras.Model):
                  kernel_initializer='glorot_uniform', **kwargs):
         super(Readout, self).__init__(**kwargs)
         self.prelu = tf.keras.layers.ReLU()
-        self.output_layer = tf.keras.layers.Dense(output_size, use_bias=use_bias, kernel_initializer=kernel_initializer)
+        self.output_layer = tf.keras.layers.Dense(
+            output_size, use_bias=use_bias, kernel_initializer=kernel_initializer)
 
     def call(self, inputs, training=False, mask=None):
         output = self.prelu(inputs)
         output = self.output_layer(output)
         return output
+
+
+class CombineCLIPVisual(tf.keras.layers.Layer):
+    def __init__(self, name="combine_clip_visual"):
+        super().__init__(name=name)
+
+        self.up_512 = Up(filters=256, in_filters=512, size=2, name="up_512")
+        self.up_1024 = Up(filters=256, in_filters=1024, size=4, name="up_1024")
+        self.up_2048 = Up(filters=256, in_filters=2048, size=8, name="up_2048")
+        self.conv_1 = tf.keras.layers.Conv2D(filters=256,
+                                             kernel_size=1,
+                                             use_bias=False)
+        self.conv_2 = tf.keras.layers.Conv2D(filters=256,
+                                             kernel_size=1,
+                                             use_bias=False)
+        self.conv_3 = tf.keras.layers.Conv2D(filters=256,
+                                             kernel_size=1,
+                                             use_bias=False)
+        self.conv_4 = tf.keras.layers.Conv2D(filters=256,
+                                             kernel_size=1,
+                                             use_bias=False)
+        self.conv_5 = tf.keras.layers.Conv2D(filters=256,
+                                             kernel_size=1,
+                                             use_bias=False)
+
+    @ tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+                                   tf.TensorSpec(
+                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+                                   tf.TensorSpec(
+                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+                                   tf.TensorSpec(
+                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+                                   tf.TensorSpec(
+                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+                                   tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features"))])
+    def call(self, inputs):
+        clip_outputs = inputs[0]
+        visual_features = inputs[1]                     # [(BN) 480 640 256]
+        _clip_features = clip_outputs[0]                # [(BN) 1024]
+        clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+        clip_512 = clip_outputs[2]                      # [(BN) 28 28 512]
+        clip_1024 = clip_outputs[3]                     # [(BN) 14 14 1024]
+        clip_2048 = clip_outputs[4]                     # [(BN) 7 7 2048]
+
+        clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
+                                    size=[480, 640],
+                                    method='bilinear')
+        clip_512r = tf.image.resize(clip_512,           # [(BN) 240 320 512]
+                                    size=[int(480 / 2), int(640 / 2)],
+                                    method='bilinear')
+        clip_1024r = tf.image.resize(clip_1024,         # [(BN) 120 160 1024]
+                                     size=[int(480 / 4), int(640 / 4)],
+                                     method='bilinear')
+        clip_2048r = tf.image.resize(clip_2048,         # [(BN) 60 80 2048]
+                                     size=[int(480 / 8), int(640 / 8)],
+                                     method='bilinear')
+
+        clip_512r_256 = self.up_512(clip_512r)          # [(BN) 480 640 256]
+        clip_1024r_256 = self.up_1024(clip_1024r)       # [(BN) 480 640 256]
+        clip_2048r_256 = self.up_2048(clip_2048r)       # [(BN) 480 640 256]
+
+        concat_256r = tf.concat(                        # [(BN) 480 640 2*256]
+            [clip_256r, visual_features], axis=-1)
+        concat_512r_256 = tf.concat(                    # [(BN) 480 640 2*256]
+            [clip_512r_256, visual_features], axis=-1)
+        concat_1024r_256 = tf.concat(                   # [(BN) 480 640 2*256]
+            [clip_1024r_256, visual_features], axis=-1)
+        concat_2048r_256 = tf.concat(                   # [(BN) 480 640 2*256]
+            [clip_2048r_256, visual_features], axis=-1)
+
+        comb_1 = self.conv_1(concat_256r)               # [(BN) 480 640 256]
+        comb_2 = self.conv_2(concat_512r_256)           # [(BN) 480 640 256]
+        comb_3 = self.conv_3(concat_1024r_256)          # [(BN) 480 640 256]
+        comb_4 = self.conv_4(concat_2048r_256)          # [(BN) 480 640 256]
+
+        concat_comb = tf.concat(                        # [(BN) 480 640 4*256]
+            [comb_1, comb_2, comb_3, comb_4], axis=-1)
+        return self.conv_5(concat_comb)                 # [(BN) 480 640 256]

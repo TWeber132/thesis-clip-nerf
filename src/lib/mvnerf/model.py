@@ -4,14 +4,12 @@ import numpy as np
 import tensorflow as tf
 from einops import rearrange, repeat
 
-from .layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures
+from .layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures, CombineCLIPVisual
 from .nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_projection_features_mv, \
     world_to_camera_direction_vector_mv, sigma_to_alpha, sample_pdf, optimize, get_rays
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
 from lib.clip.main import load_clip
 from lib.clip.utils import preprocess_tf
-from lib.unet.model_parts import Down, Up
-from lib.semantic_pathway.fusion import FusionConv
 
 
 class MVVNeRFRenderer(tf.keras.Model):
@@ -32,17 +30,8 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.clip_visual_features = load_clip().visual
         self.clip_visual_features.trainable = False
-        self.down_512 = Down(filters=512, name="down_512")
-        self.down_1024 = Down(filters=1024, name="down_1024")
-        self.fusion_256 = FusionConv(filters=256, name="fusion_conv_256")
-        self.fusion_512 = FusionConv(filters=512, name="fusion_conv_512")
-        self.fusion_1024 = FusionConv(filters=1024, name="fusion_conv_1024")
-        self.up_512 = Up(filters=256, in_filters=512, name="up_512")
-        self.up_1024_1 = Up(filters=512, in_filters=1024, name="up_1024_1")
-        self.up_1024_2 = Up(filters=256, in_filters=512, name="up_1024_2")
-        self.conv = tf.keras.layers.Conv2D(filters=256,
-                                           kernel_size=1,
-                                           use_bias=False)
+
+        self.combine_clip_visual_features = CombineCLIPVisual()
 
         self.n_samples = n_samples
         self.n_rays_train = n_rays_train
@@ -93,85 +82,135 @@ class MVVNeRFRenderer(tf.keras.Model):
         clip_images = preprocess_tf(src_images)
         clip_outputs = self.clip_visual_features(clip_images)
         visual_features = self.encode(src_images)
-        combined_features = self.combine_clip_visual_features_trivial(
-            clip_outputs, visual_features)
+        combined_features = self.combine_clip_visual_features(
+            (clip_outputs, visual_features))
 
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', b=self.batch_size)
         return self._call(inputs, self.n_rays_train, self.batch_size, combined_features)
 
-    @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
-                                   tf.TensorSpec(
-                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
-                                   tf.TensorSpec(
-                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
-                                   tf.TensorSpec(
-                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
-                                   tf.TensorSpec(
-                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
-                                   tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
-    def combine_clip_visual_features_complex(self, clip_outputs, visual_features):
-        _clip_features = clip_outputs[0]                # [(BN) 1024]
-        clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
-        clip_512 = clip_outputs[2]                      # [(BN) 28 28 512]
-        clip_1024 = clip_outputs[3]                     # [(BN) 14 14 1024]
-        _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
+    # @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+    #                                tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
+    # def combine_clip_visual_features_complex(self, clip_outputs, visual_features):
+    #     _clip_features = clip_outputs[0]                # [(BN) 1024]
+    #     clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+    #     clip_512 = clip_outputs[2]                      # [(BN) 28 28 512]
+    #     clip_1024 = clip_outputs[3]                     # [(BN) 14 14 1024]
+    #     _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
 
-        visual_512 = self.down_512(visual_features)     # [(BN) 240 320 512]
-        visual_1024 = self.down_1024(visual_512)        # [(BN) 120 160 1024]
+    #     visual_512 = self.down_512(visual_features)     # [(BN) 240 320 512]
+    #     visual_1024 = self.down_1024(visual_512)        # [(BN) 120 160 1024]
 
-        clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
-                                    size=[480, 640],
-                                    method='bicubic')
-        clip_512r = tf.image.resize(clip_512,           # [(BN) 240 320 512]
-                                    size=[int(480 / 2), int(640 / 2)],
-                                    method='bicubic')
-        clip_1024r = tf.image.resize(clip_1024,         # [(BN) 120 160 1024]
-                                     size=[int(480 / 4), int(640 / 4)],
-                                     method='bicubic')
+    #     clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
+    #                                 size=[480, 640],
+    #                                 method='bicubic')
+    #     clip_512r = tf.image.resize(clip_512,           # [(BN) 240 320 512]
+    #                                 size=[int(480 / 2), int(640 / 2)],
+    #                                 method='bicubic')
+    #     clip_1024r = tf.image.resize(clip_1024,         # [(BN) 120 160 1024]
+    #                                  size=[int(480 / 4), int(640 / 4)],
+    #                                  method='bicubic')
 
-        fused_256 = self.fusion_256(                    # [(BN) 480 640 256]
-            [visual_features, clip_256r])
-        fused_512 = self.fusion_512(                    # [(BN) 240 320 512]
-            [visual_512, clip_512r])
-        fused_1024 = self.fusion_1024(                  # [(BN) 120 160 1024]
-            [visual_1024, clip_1024r])
+    #     fused_256 = self.fusion_256(                    # [(BN) 480 640 256]
+    #         [visual_features, clip_256r])
+    #     fused_512 = self.fusion_512(                    # [(BN) 240 320 512]
+    #         [visual_512, clip_512r])
+    #     fused_1024 = self.fusion_1024(                  # [(BN) 120 160 1024]
+    #         [visual_1024, clip_1024r])
 
-        fused_256_512 = self.up_512(fused_512)          # [(BN) 480 640 256]
-        fused_256_1024 = self.up_1024_2(                # [(BN) 480 640 256]
-            self.up_1024_1(fused_1024))
+    #     fused_256_512 = self.up_512(fused_512)          # [(BN) 480 640 256]
+    #     fused_256_1024 = self.up_1024_2(                # [(BN) 480 640 256]
+    #         self.up_1024_1(fused_1024))
 
-        fusion = tf.concat([fused_256,                  # [(BN) 480 640 3*256]
-                            fused_256_512,
-                            fused_256_1024], axis=-1)
-        fusion = self.conv(fusion)                      # [(BN) 480 640 256]
-        return fusion
+    #     fusion = tf.concat([fused_256,                  # [(BN) 480 640 3*256]
+    #                         fused_256_512,
+    #                         fused_256_1024], axis=-1)
+    #     fusion = self.conv(fusion)                      # [(BN) 480 640 256]
+    #     return fusion
 
-    @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
-                                   tf.TensorSpec(
-                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
-                                   tf.TensorSpec(
-                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
-                                   tf.TensorSpec(
-                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
-                                   tf.TensorSpec(
-                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
-                                   tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
-    def combine_clip_visual_features_trivial(self, clip_outputs, visual_features):
-        _clip_features = clip_outputs[0]                # [(BN) 1024]
-        clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
-        _clip_512 = clip_outputs[2]                     # [(BN) 28 28 512]
-        _clip_1024 = clip_outputs[3]                    # [(BN) 14 14 1024]
-        _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
+    # @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+    #                                tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
+    # def combine_clip_visual_features_smart(self, clip_outputs, visual_features):
+    #     _clip_features = clip_outputs[0]                # [(BN) 1024]
+    #     clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+    #     clip_512 = clip_outputs[2]                      # [(BN) 28 28 512]
+    #     clip_1024 = clip_outputs[3]                     # [(BN) 14 14 1024]
+    #     clip_2048 = clip_outputs[4]                     # [(BN) 7 7 2048]
 
-        clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
-                                    size=[480, 640],
-                                    method='bicubic')
+    #     clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
+    #                                 size=[480, 640],
+    #                                 method='bilinear')
+    #     clip_512r = tf.image.resize(clip_512,           # [(BN) 240 320 512]
+    #                                 size=[int(480 / 2), int(640 / 2)],
+    #                                 method='bilinear')
+    #     clip_1024r = tf.image.resize(clip_1024,         # [(BN) 120 160 1024]
+    #                                  size=[int(480 / 4), int(640 / 4)],
+    #                                  method='bilinear')
+    #     clip_2048r = tf.image.resize(clip_2048,         # [(BN) 60 80 2048]
+    #                                  size=[int(480 / 8), int(640 / 8)],
+    #                                  method='bilinear')
 
-        fusion = tf.concat([clip_256r,                  # [(BN) 480 640 2*256]
-                            visual_features], axis=-1)
-        fusion = self.conv(fusion)                      # [(BN) 480 640 256]
-        return fusion
+    #     clip_512r_256 = None
+    #     clip_1024r_256 = None
+    #     clip_2048r_256 = None
+    #     fused_256 = self.fusion_256(                    # [(BN) 480 640 256]
+    #         [visual_features, clip_256r])
+    #     fused_512 = self.fusion_512(                    # [(BN) 240 320 512]
+    #         [visual_512, clip_512r])
+    #     fused_1024 = self.fusion_1024(                  # [(BN) 120 160 1024]
+    #         [visual_1024, clip_1024r])
+
+    #     fused_256_512 = self.up_512(fused_512)          # [(BN) 480 640 256]
+    #     fused_256_1024 = self.up_1024_2(                # [(BN) 480 640 256]
+    #         self.up_1024_1(fused_1024))
+
+    #     fusion = tf.concat([fused_256,                  # [(BN) 480 640 3*256]
+    #                         fused_256_512,
+    #                         fused_256_1024], axis=-1)
+    #     fusion = self.conv(fusion)                      # [(BN) 480 640 256]
+    #     return fusion
+
+    # @ tf.function(input_signature=[(tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+    #                                tf.TensorSpec(
+    #                                    shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+    #                                tf.TensorSpec(shape=(None, 480, 640, 256), dtype=tf.float32, name="visual_features")])
+    # def combine_clip_visual_features_trivial(self, clip_outputs, visual_features):
+    #     _clip_features = clip_outputs[0]                # [(BN) 1024]
+    #     clip_256 = clip_outputs[1]                      # [(BN) 56 56 256]
+    #     _clip_512 = clip_outputs[2]                     # [(BN) 28 28 512]
+    #     _clip_1024 = clip_outputs[3]                    # [(BN) 14 14 1024]
+    #     _clip_2048 = clip_outputs[4]                    # [(BN) 7 7 2048]
+
+    #     clip_256r = tf.image.resize(clip_256,           # [(BN) 480 640 256]
+    #                                 size=[480, 640],
+    #                                 method='bicubic')
+
+    #     fusion = tf.concat([clip_256r,                  # [(BN) 480 640 2*256]
+    #                         visual_features], axis=-1)
+    #     fusion = self.conv(fusion)                      # [(BN) 480 640 256]
+    #     return fusion
 
     @ staticmethod
     def volumetric_render(zs, density, chromacity):

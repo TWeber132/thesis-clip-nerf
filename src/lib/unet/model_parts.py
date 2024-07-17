@@ -37,18 +37,13 @@ class DoubleConv(tf.keras.layers.Layer):
 class Up(tf.keras.layers.Layer):
     """Upscaling then double conv"""
 
-    def __init__(self, filters, in_filters, bilinear=True, name="up"):
+    def __init__(self, filters, in_filters, size=(2, 2), name="up"):
         super().__init__(name=name)
 
         # if bilinear, use the normal convolutions to reduce the number of channels
-        if bilinear:
-            self.up = tf.keras.layers.UpSampling2D(
-                size=2, interpolation='bilinear')  # align_corners
-            self.conv = DoubleConv(filters, in_filters // 2)
-        else:
-            self.up = tf.keras.layers.ConvTranspose2d(
-                in_filters // 2, kernel_size=2, strides=2)
-            self.conv = DoubleConv(filters)
+        self.up = tf.keras.layers.UpSampling2D(
+            size=size, interpolation='bilinear')  # align_corners
+        self.conv = DoubleConv(filters, in_filters // 2)
 
     @tf.function(reduce_retracing=True)
     def call(self, x):
