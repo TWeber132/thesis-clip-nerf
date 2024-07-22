@@ -12,7 +12,7 @@ from lib.mvnerf.nerf_utils import optimize
 from lib.delta_ngf.layers import GraspReadout
 from lib.mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding, CombineCLIPVisual
 from lib.clip.model import CLIPVisualEncoder, CLIPTextualEncoder
-from lib.clip.utils import preprocess_tf, tokenize
+from lib.clip.utils import preprocess_tf
 
 
 def t_m_to_h_matrix(translations, rot_matrices):
@@ -166,22 +166,23 @@ class LanguageNeRF(tf.keras.Model):
 
     def call(self, inputs, training=False, mask=None):
         src_images = inputs[4]
-        texts = inputs[7]
+        clip_tokens = inputs[7]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
         clip_images = preprocess_tf(src_images)
-        clip_tokens = tokenize(texts)
         clip_outputs = self.clip_visual(clip_images)
         visual_features = self.visual_features(src_images)
         combined_features = self.combine_clip_visual_features(
             (clip_outputs, visual_features))
         clip_textuals = self.clip_textual(clip_tokens)  # [BN 1024]
-        clip_textuals_tiled = tf.expand_dims(tf.expand_dims(clip_textuals, axis=1), axis=1)
+        clip_textuals_tiled = tf.expand_dims(
+            tf.expand_dims(clip_textuals, axis=1), axis=1)
         clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
             combined_features)[1], axis=1)  # [BN h w 1024]
         clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
             combined_features)[2], axis=2)  # [BN h w 1024]
         clip_textuals_tiled = clip_textuals_tiled[..., :256]
-        combined_features = tf.math.multiply(combined_features, clip_textuals_tiled) # [BN h w 256]
+        combined_features = tf.math.multiply(
+            combined_features, clip_textuals_tiled)  # [BN h w 256]
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
         # transforms = t_q_to_h_matrix(self.translations, self.quaternions)
@@ -275,23 +276,24 @@ class LanguageNeRF(tf.keras.Model):
 
         self.set_pose(inputs[0], inputs[1])
         src_images = inputs[4]
-        texts = inputs[7]
+        clip_tokens = inputs[7]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
         visual_features = self.visual_features(src_images)
         clip_images = preprocess_tf(src_images)
-        clip_tokens = tokenize(texts)
         clip_outputs = self.clip_visual(clip_images)
         visual_features = self.visual_features(src_images)
         combined_features = self.combine_clip_visual_features(
             (clip_outputs, visual_features))
         clip_textuals = self.clip_textual(clip_tokens)  # [BN 1024]
-        clip_textuals_tiled = tf.expand_dims(tf.expand_dims(clip_textuals, axis=1), axis=1)
+        clip_textuals_tiled = tf.expand_dims(
+            tf.expand_dims(clip_textuals, axis=1), axis=1)
         clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
             combined_features)[1], axis=1)  # [BN h w 1024]
         clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
             combined_features)[2], axis=2)  # [BN h w 1024]
         clip_textuals_tiled = clip_textuals_tiled[..., :256]
-        combined_features = tf.math.multiply(combined_features, clip_textuals_tiled) # [BN h w 256]
+        combined_features = tf.math.multiply(
+            combined_features, clip_textuals_tiled)  # [BN h w 256]
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
         transforms = self.compute_matrices()

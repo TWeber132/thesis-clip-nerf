@@ -5,6 +5,7 @@ from manipulation_tasks.transform import Affine
 
 from lib.data_generator.base import DataGenerator
 from lib.data_generator.util import camera_parameters
+from lib.clip.utils import tokenize
 
 
 class LanguageDataGenerator(DataGenerator):
@@ -108,7 +109,7 @@ class LanguageDataGenerator(DataGenerator):
         for i in batch:
             trajectory = self.dataset.datasets['trajectory'].read_sample(i)[
                 'trajectory']
-            
+
             initial_index = np.random.randint(
                 0, len(trajectory) - self.future_poses - 1)
             required_poses = trajectory[initial_index:
@@ -165,11 +166,13 @@ class LanguageDataGenerator(DataGenerator):
         return translations, rotations, target_d_t, target_d_q
 
     def get_data_text(self, batch):
-        texts = []
+        tokens = []
         for i in batch:
             text = self.dataset.datasets['language'].read_sample(i)
-            texts.append(text)
-        return texts
+            token = tokenize(text)
+            tokens.append(token)
+        tokens = np.array(tokens, dtype=np.int32)
+        return tokens
 
     def get_data(self, batch):
         src_imagess, src_intrinsicss, src_extrinsics_invs = self.get_data_camera(
@@ -178,7 +181,7 @@ class LanguageDataGenerator(DataGenerator):
             batch)
         translations, rotations, target_d_t, target_d_r = self.get_data_grad(
             batch)
-        texts = self.get_data_text(batch)
+        clip_tokens = self.get_data_text(batch)
         inputs = [
             input_translations,
             input_rotations,
@@ -187,7 +190,7 @@ class LanguageDataGenerator(DataGenerator):
             src_imagess,
             src_intrinsicss,
             src_extrinsics_invs,
-            texts
+            clip_tokens
         ]
         targets = [
             targets,
