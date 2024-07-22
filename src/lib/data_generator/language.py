@@ -164,11 +164,11 @@ class LanguageDataGenerator(DataGenerator):
         return translations, rotations, target_d_t, target_d_q
 
     def get_data_text(self, batch):
-        languages = []
+        texts = []
         for i in batch:
-            language = self.dataset.datasets['language'].read_sample(i)
-            languages.append(language)
-        return languages
+            text = self.dataset.datasets['language'].read_sample(i)
+            texts.append(text)
+        return texts
 
     def get_data(self, batch):
         src_imagess, src_intrinsicss, src_extrinsics_invs = self.get_data_camera(
