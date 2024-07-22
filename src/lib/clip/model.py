@@ -10,14 +10,17 @@ def load_clip():
 
 class CLIP():
     def __init__(self) -> None:
-        self = load_clip()
+        self.clip = load_clip()
         self.trainable = False
 
 
 class CLIPVisualEncoder():
     def __init__(self) -> None:
-        self = load_clip().visual
+        self.clip = load_clip().visual
         self.trainable = False
+
+    def call(self, inputs):
+        self.clip.encode_image(inputs)
 
 
 class CLIPTextualEncoder():

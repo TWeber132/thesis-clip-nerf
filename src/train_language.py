@@ -12,7 +12,7 @@ from lib.language.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
 from training import train_grasp_model
 from util import setup_oracle, get_inputs
-from lib.dataset.dataset import load_dataset_language, load_dataset_goal
+from lib.dataset.utils import load_dataset_language, load_dataset_goal
 
 import wandb
 
