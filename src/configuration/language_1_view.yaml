@@ -1,0 +1,6 @@
+defaults:
+  - default_language
+  - nerf_model: 1_view
+  - grasp_model: language
+  - grasp_training: language_1_view
+  - validation: 3_images

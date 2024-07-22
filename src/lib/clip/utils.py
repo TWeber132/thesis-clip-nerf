@@ -5,7 +5,7 @@ from typing import Any, Tuple, List, Union
 from tensorflow.python.ops import math_ops
 import matplotlib.pyplot as plt
 
-from .simple_tokenizer import SimpleTokenizer
+from simple_tokenizer import SimpleTokenizer
 
 
 def preprocess(image: np.ndarray, to_size: int = 224) -> np.ndarray:

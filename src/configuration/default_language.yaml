@@ -1,0 +1,8 @@
+defaults:
+  - default
+  - dataset: language
+  - generator_grasp: language
+valid_sample_indices:
+  - 0
+  - 4
+  - 7

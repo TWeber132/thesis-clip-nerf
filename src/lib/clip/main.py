@@ -1,21 +1,16 @@
-from typing import Union, List, Tuple
 import numpy as np
 import tensorflow as tf
 from PIL import Image
 
-from .utils import preprocess, tokenize
-
-
-def load_clip():
-    clip_dir = "/home/jovyan/data/storage/clip_weights"
-    clip = tf.keras.models.load_model(clip_dir)
-    return clip
+from utils import preprocess, tokenize
+from model import CLIP
 
 
 def main():
     # tf.config.run_functions_eagerly(True)
     # tf.compat.v1.disable_eager_execution()
     # print("eager:", tf.executing_eagerly())
+    clip = CLIP()
 
     _image = Image.open("/home/robot/docker_volume/nn_training/lego.jpg")
     _image2 = Image.open("/home/robot/docker_volume/nn_training/lego2.jpeg")
@@ -24,8 +19,6 @@ def main():
     image = preprocess(_image)
     image2 = preprocess(_image2)
     texts = tokenize(_texts)
-
-    clip = load_clip()
 
     logits_per_image, logits_per_text = clip.predict((image, texts))
     tf_probs = tf.nn.softmax(logits_per_image, axis=1)
