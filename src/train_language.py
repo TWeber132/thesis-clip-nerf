@@ -7,8 +7,8 @@ from omegaconf import DictConfig
 import hydra
 
 from lib.data_generator.language import LanguageDataGenerator
-from lib.language.model import LanguageNeRF
-from lib.language.grasp_optimizer import DNGFOptimizer
+from lib.lmvnerf.model import LanguageNeRF
+from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
 from training import train_grasp_model
 from util import setup_oracle, get_inputs

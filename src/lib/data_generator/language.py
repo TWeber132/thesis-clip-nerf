@@ -166,11 +166,11 @@ class LanguageDataGenerator(DataGenerator):
         return translations, rotations, target_d_t, target_d_q
 
     def get_data_text(self, batch):
-        tokens = []
+        texts = []
         for i in batch:
             text = self.dataset.datasets['language'].read_sample(i)
-            token = tokenize(text)
-            tokens.append(token)
+            texts.append(text)
+        tokens = tokenize(texts)
         tokens = np.array(tokens, dtype=np.int32)
         return tokens
 
