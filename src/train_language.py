@@ -19,6 +19,7 @@ import wandb
 
 @hydra.main(version_base=None, config_path="configuration", config_name="language_1_view")
 def main(cfg: DictConfig) -> None:
+    tf.config.run_functions_eagerly(True)
     # allow memory growth to avoid OOM errors
     gpus = tf.config.list_physical_devices('GPU')
     for gpu in gpus:
@@ -26,9 +27,10 @@ def main(cfg: DictConfig) -> None:
     logger.remove()
     logger.add(sys.stderr, level="INFO")
 
-    train_dataset = load_dataset_language(**cfg.dataset, dataset_type='train')
+    train_dataset = load_dataset_language(
+        cfg.dataset.n_perspectives, cfg.dataset.path + '/train')
     valid_dataset = load_dataset_goal(
-        **cfg.dataset, dataset_type='valid')  # load_dataset_baseline
+        cfg.dataset.n_perspectives, cfg.dataset.path + '/valid')  # load_dataset_baseline
 
     data_generator = LanguageDataGenerator(train_dataset,
                                            **cfg.generator_grasp,

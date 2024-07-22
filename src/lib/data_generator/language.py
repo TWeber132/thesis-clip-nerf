@@ -67,7 +67,8 @@ class LanguageDataGenerator(DataGenerator):
         targets = []
 
         for i in batch:
-            target_pose = self.dataset.datasets['grasp_pose'].read_sample(i)
+            target_pose = self.dataset.datasets['grasp_pose'].read_sample(i)[
+                'grasp_pose']
 
             negative_samples = [Affine.random(self.workspace_bounds).matrix for _ in
                                 range(self.n_negative + self.future_poses - 1)]
@@ -104,7 +105,9 @@ class LanguageDataGenerator(DataGenerator):
         target_d_q = []
 
         for i in batch:
-            trajectory = self.dataset.datasets['trajectory'].read_sample(i)
+            trajectory = self.dataset.datasets['trajectory'].read_sample(i)[
+                'trajectory']
+
             initial_index = np.random.randint(
                 0, len(trajectory) - self.future_poses - 1)
             required_poses = trajectory[initial_index:
