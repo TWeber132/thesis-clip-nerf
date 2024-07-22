@@ -8,25 +8,31 @@ def load_clip():
     return clip
 
 
-class CLIP():
+class CLIP(tf.keras.Model):
     def __init__(self) -> None:
+        super().__init__()
         self.clip = load_clip()
-        self.trainable = False
+        self.clip.trainable = False
+        
+    def call(self, inputs):
+        return self.clip(inputs)
 
 
-class CLIPVisualEncoder():
+class CLIPVisualEncoder(tf.keras.Model):
     def __init__(self) -> None:
-        self.clip = load_clip().visual
-        self.trainable = False
+        super().__init__()
+        self.clip = load_clip()
+        self.clip.trainable = False
 
     def call(self, inputs):
-        self.clip.encode_image(inputs)
+        return self.clip.encode_image(inputs)
 
 
-class CLIPTextualEncoder():
+class CLIPTextualEncoder(tf.keras.Model):
     def __init__(self) -> None:
+        super().__init__()
         self.clip = load_clip()
-        self.trainable = False
+        self.clip.trainable = False
 
     def call(self, inputs):
-        self.clip.encode_text(inputs)
+        return self.clip.encode_text(inputs)

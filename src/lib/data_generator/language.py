@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import tensorflow as tf
 from manipulation_tasks.transform import Affine
 
 from lib.data_generator.base import DataGenerator
@@ -107,7 +108,7 @@ class LanguageDataGenerator(DataGenerator):
         for i in batch:
             trajectory = self.dataset.datasets['trajectory'].read_sample(i)[
                 'trajectory']
-
+            
             initial_index = np.random.randint(
                 0, len(trajectory) - self.future_poses - 1)
             required_poses = trajectory[initial_index:

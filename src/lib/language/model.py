@@ -171,19 +171,17 @@ class LanguageNeRF(tf.keras.Model):
         clip_images = preprocess_tf(src_images)
         clip_tokens = tokenize(texts)
         clip_outputs = self.clip_visual(clip_images)
+        visual_features = self.visual_features(src_images)
         combined_features = self.combine_clip_visual_features(
             (clip_outputs, visual_features))
         clip_textuals = self.clip_textual(clip_tokens)  # [BN 1024]
-        tf.print(tf.shape(clip_textuals))
-        clip_textuals_tiled = tf.repeat(clip_textuals, repeats=tf.shape(
+        clip_textuals_tiled = tf.expand_dims(tf.expand_dims(clip_textuals, axis=1), axis=1)
+        clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
             combined_features)[1], axis=1)  # [BN h w 1024]
-        tf.print(tf.shape(clip_textuals_tiled))  # [BN 480 w 256]
-        clip_textuals_tiled = tf.repeat(clip_textuals, repeats=tf.shape(
+        clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
             combined_features)[2], axis=2)  # [BN h w 1024]
-        tf.print(tf.shape(clip_textuals_tiled))  # [BN 480 640 256]
-        visual_features = self.visual_features(src_images)
-        combined_features = tf.tensordot(
-            combined_features, clip_textuals_tiled, axes=-1)
+        clip_textuals_tiled = clip_textuals_tiled[..., :256]
+        combined_features = tf.math.multiply(combined_features, clip_textuals_tiled) # [BN h w 256]
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
         # transforms = t_q_to_h_matrix(self.translations, self.quaternions)
@@ -277,15 +275,30 @@ class LanguageNeRF(tf.keras.Model):
 
         self.set_pose(inputs[0], inputs[1])
         src_images = inputs[4]
+        texts = inputs[7]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
-        batched_features = self.visual_features(src_images)
-        batched_features = rearrange(
-            batched_features, '(b n) h w c -> b n h w c', n=self.n_views)
+        visual_features = self.visual_features(src_images)
+        clip_images = preprocess_tf(src_images)
+        clip_tokens = tokenize(texts)
+        clip_outputs = self.clip_visual(clip_images)
+        visual_features = self.visual_features(src_images)
+        combined_features = self.combine_clip_visual_features(
+            (clip_outputs, visual_features))
+        clip_textuals = self.clip_textual(clip_tokens)  # [BN 1024]
+        clip_textuals_tiled = tf.expand_dims(tf.expand_dims(clip_textuals, axis=1), axis=1)
+        clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
+            combined_features)[1], axis=1)  # [BN h w 1024]
+        clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
+            combined_features)[2], axis=2)  # [BN h w 1024]
+        clip_textuals_tiled = clip_textuals_tiled[..., :256]
+        combined_features = tf.math.multiply(combined_features, clip_textuals_tiled) # [BN h w 256]
+        combined_features = rearrange(
+            combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
         transforms = self.compute_matrices()
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(self.grasp_readout.trainable_variables)
             y_pred = self._call(inputs, transforms,
-                                self.n_points_train, batched_features)
+                                self.n_points_train, combined_features)
             if self.softmax_before_loss:
                 y_pred = tf.nn.softmax(y_pred)
             landscape_loss = self.loss(labels[0], y_pred)
@@ -297,7 +310,7 @@ class LanguageNeRF(tf.keras.Model):
             with tf.GradientTape() as tape_1:
                 transforms = self.compute_matrices()
                 prediction = self._call(
-                    inputs, transforms, self.n_points_train, batched_features)
+                    inputs, transforms, self.n_points_train, combined_features)
             output_gradients = tape_1.gradient(prediction, self.pose_variables)
             loss_t = self.cosine_similarity(labels[1], output_gradients[0])
 
