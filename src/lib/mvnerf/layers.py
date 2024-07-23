@@ -413,6 +413,12 @@ class Readout(tf.keras.Model):
 
 class Level(tf.keras.layers.Layer):
     def __init__(self, downscale=1, vis_size=(240, 320), filters=256, name="level"):
+        # super().__init__(name=name)
+        return LevelV0(downscale=downscale, vis_size=vis_size, filters=filters, name=name)
+
+
+class LevelV0(tf.keras.layers.Layer):
+    def __init__(self, downscale=1, vis_size=(240, 320), filters=256, name="level"):
         super().__init__(name=name)
         self.vis_size = vis_size
         self.filters = filters
@@ -444,18 +450,94 @@ class Level(tf.keras.layers.Layer):
         return x
 
 
-class CLIPFeatureExtraction(tf.keras.layers.Layer):
-    def __init__(self, name="clip_feature_extraction"):
+class LevelV1(tf.keras.layers.Layer):
+    def __init__(self, out_shape=(240, 320, 256), name="level"):
         super().__init__(name=name)
+        self.out_shape = out_shape
 
-        # 4 features per feature map shall correspond to clip features
+        self.resize = tf.keras.layers.Resizing(
+            out_shape[0], out_shape[1], interpolation='bilinear')
+        self.pre_conv = tf.keras.layers.Conv2D(
+            filters=self.out_shape[2], kernel_size=1, use_bias=False)
+        self.post_conv = tf.keras.layers.Conv2D(
+            filters=self.out_shape[2], kernel_size=1, use_bias=False)
+
+        self.clip_feature_extractor = CLIPFeatureExtraction(shape=out_shape)
+        self.clip_reg_loss = tf.keras.losses.CategoricalCrossentropy()
+
+    @tf.function(reduce_retracing=True)
+    def call(self, inputs):
+        clip_true = inputs[0]
+        clip_x = inputs[1]
+        vis = inputs[2]
+
+        clip_x = self.resize(self.pre_conv(clip_x))  # [(BN) h w 256]
+        vis = self.resize(vis)  # [(BN) h w 256]
+        x = tf.concat([clip_x, vis], axis=-1)  # [(BN) h w 512]
+        x = self.post_conv(x)  # [(BN) h w 256]
+        clip_pred = self.clip_feature_extractor(x)
+        loss = self.clip_reg_loss(clip_true, clip_pred)
+        # Prevent the layer from ignoring the CLIP features and focus on vis
+        self.add_loss(loss)
+        return x
+
+
+class CLIPFeatureExtraction(tf.keras.layers.Layer):
+    def __init__(self, shape=(240, 320, 256), name="clip_feature_extraction"):
+        super().__init__(name=name)
+        assert shape[3] == 256, f"Expected 256 input channels but got {shape[3]} which does not lead to 1024 output channels."
+        pool_size = (shape[1] // 2, shape[2] // 2)
+
+        # 4 features per feature map
         self.max_pool = tf.keras.layers.MaxPool2D(
-            pool_size=(120, 160), strides=(120, 160), padding='valid')
+            pool_size=pool_size, strides=pool_size, padding='valid')
         self.flatten = tf.keras.layers.Flatten()
 
-    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 240, 320, 256), dtype=tf.float32, name="combined_features")])
+    @tf.function(reduce_retracing=True)
     def call(self, inputs):
         return self.flatten(self.max_pool(inputs))
+
+
+class CombineCLIPVisualV3(tf.keras.layers.Layer):
+    def __init__(self, name="combine_clip_visual"):
+        super().__init__(name=name)
+        shape_level_1 = (240, 320, 256)
+        shape_level_2 = (120, 160, 256)
+        shape_level_3 = (60, 80, 256)
+        shape_level_4 = (30, 40, 256)
+        self.level_1 = LevelV1(out_shape=shape_level_1)
+        self.level_2 = LevelV1(out_shape=shape_level_2)
+        self.level_3 = LevelV1(out_shape=shape_level_3)
+        self.level_4 = LevelV1(out_shape=shape_level_4)
+
+    @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+                                   tf.TensorSpec(
+                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+                                   tf.TensorSpec(
+                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+                                   tf.TensorSpec(
+                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+                                   tf.TensorSpec(
+                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+                                   tf.TensorSpec(shape=(None, 240, 320, 256), dtype=tf.float32, name="visual_features"))])
+    def call(self, inputs):
+        clip_outputs = inputs[0]
+        vis = inputs[1]                             # [(BN) 480 640 256]
+        clip_features = clip_outputs[0]             # [(BN) 1024]
+        clip_1 = clip_outputs[1]                    # [(BN) 56 56 256]
+        clip_2 = clip_outputs[2]                    # [(BN) 28 28 512]
+        clip_3 = clip_outputs[3]                    # [(BN) 14 14 1024]
+        clip_4 = clip_outputs[4]                    # [(BN) 7 7 2048]
+
+        x_level_1 = self.level_1(
+            (clip_features, clip_1, vis))     # [(BN) 240 320 256]
+        x_level_2 = self.level_2(
+            (clip_features, clip_2, vis))     # [(BN) 120 160 256]
+        x_level_3 = self.level_3(
+            (clip_features, clip_3, vis))     # [(BN) 60 80 256]
+        x_level_4 = self.level_4(
+            (clip_features, clip_4, vis))     # [(BN) 30 40 256]
+        return x_level_1, x_level_2, x_level_3, x_level_4
 
 
 class CombineCLIPVisualV2(tf.keras.layers.Layer):
