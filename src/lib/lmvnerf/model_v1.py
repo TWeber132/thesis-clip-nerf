@@ -10,7 +10,7 @@ import tensorflow_graphics.geometry.transformation as tf_transformation
 from lib.mvnerf.nerf_utils import optimize
 
 from lib.delta_ngf.layers import GraspReadout
-from lib.mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding, CombineCLIPVisual
+from lib.mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding, CombineCLIPVisualV1
 from lib.clip.model import CLIPVisualEncoder, CLIPTextualEncoder
 from lib.clip.utils import preprocess_tf
 
@@ -55,7 +55,7 @@ class LanguageNeRF(tf.keras.Model):
         self.clip_visual = CLIPVisualEncoder()
         self.clip_textual = CLIPTextualEncoder()
         self.grasp_readout = GraspReadout(use_bias=True)
-        self.combine_clip_visual_features = CombineCLIPVisual()
+        self.combine_clip_visual_features = CombineCLIPVisualV1()
 
         self.mse = tf.keras.losses.MeanSquaredError()
         self.cosine_similarity = tf.keras.losses.CosineSimilarity(axis=-1)

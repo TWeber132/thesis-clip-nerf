@@ -444,6 +444,20 @@ class Level(tf.keras.layers.Layer):
         return x
 
 
+class CLIPFeatureExtraction(tf.keras.layers.Layer):
+    def __init__(self, name="clip_feature_extraction"):
+        super().__init__(name=name)
+
+        # 4 features per feature map shall correspond to clip features
+        self.max_pool = tf.keras.layers.MaxPool2D(
+            pool_size=(120, 160), strides=(120, 160), padding='valid')
+        self.flatten = tf.keras.layers.Flatten()
+
+    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 240, 320, 256), dtype=tf.float32, name="combined_features")])
+    def call(self, inputs):
+        return self.flatten(self.max_pool(inputs))
+
+
 class CombineCLIPVisualV2(tf.keras.layers.Layer):
     def __init__(self, name="combine_clip_visual"):
         super().__init__(name=name)
@@ -457,12 +471,8 @@ class CombineCLIPVisualV2(tf.keras.layers.Layer):
         self.conv = tf.keras.layers.Conv2D(filters=filters,
                                            kernel_size=1,
                                            use_bias=False)
-        self.up = tf.keras.layers.UpSampling2D(
-            size=2, interpolation='bilinear')
 
-        self.max_pool = tf.keras.layers.MaxPool2D(
-            pool_size=(120, 160), strides=(120, 160), padding='valid')
-        self.flatten = tf.keras.layers.Flatten()
+        self.clip_feature_extraction = CLIPFeatureExtraction()
         self.clip_regulizer_loss = tf.keras.losses.CategoricalCrossentropy()
 
     @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
@@ -492,12 +502,10 @@ class CombineCLIPVisualV2(tf.keras.layers.Layer):
         x = tf.concat(                              # [(BN) 240 320 1024]
             [x_level_1, x_level_2, x_level_3, x_level_4], axis=-1)
         x = self.conv(x)                            # [(BN) 240 320 256]
-        clip_pred = self.max_pool(x)                # [(BN) 2 2 256]
-        clip_pred = self.flatten(clip_pred)         # [(BN) 1024
-        loss = self.clip_regulizer_loss(clip_features, clip_pred)
+        clip_features_pred = self.clip_feature_extraction(x)  # [(BN) 1024]
+        loss = self.clip_regulizer_loss(clip_features, clip_features_pred)
         # Prevent the layer from ignoring the CLIP features and focus on vis
         self.add_loss(loss)
-        x = self.up(x)
         return x
 
 
