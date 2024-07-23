@@ -460,8 +460,8 @@ class CombineCLIPVisualV2(tf.keras.layers.Layer):
         self.up = tf.keras.layers.UpSampling2D(
             size=2, interpolation='bilinear')
 
+        self.max_pool = tf.keras.layers.MaxPool2D(pool_size=(120, 160), strides=(120, 160), padding='valid')
         self.flatten = tf.keras.layers.Flatten()
-        self.dense = tf.keras.layers.Dense(1024, use_bias=False)
         self.clip_regulizer_loss = tf.keras.losses.CategoricalCrossentropy()
 
     @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
@@ -491,7 +491,8 @@ class CombineCLIPVisualV2(tf.keras.layers.Layer):
         x = tf.concat(                              # [(BN) 240 320 1024]
             [x_level_1, x_level_2, x_level_3, x_level_4], axis=-1)
         x = self.conv(x)                            # [(BN) 240 320 256]
-        clip_pred = self.dense(self.flatten(x))     # [(BN) 1024]
+        clip_pred = self.max_pool(x)                # [(BN) 2 2 256]
+        clip_pred = self.flatten(clip_pred)         # [(BN) 1024
         loss = self.clip_regulizer_loss(clip_features, clip_pred)
         # Prevent the layer from ignoring the CLIP features and focus on vis
         self.add_loss(loss)
