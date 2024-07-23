@@ -13,63 +13,63 @@ from lib.dataset.dataset import ColorDataset, MNPZDataset, NPZDataset, PickleDat
 import tensorflow as tf
 
 
-def load_dataset(n_perspectives, path, dataset_type='train'):
-    dataset_path = f'{path}/{dataset_type}'
-    color_dataset = ColorDataset(name='color', n_perspectives=n_perspectives,
-                                 path=dataset_path)
-    camera_config_dataset = MNPZDataset(keywords=['intrinsics', 'pose'], name='camera_config',
-                                        path=dataset_path,
-                                        n_samples=n_perspectives)
-    grasp_pose_dataset = NPZDataset(keywords=['grasp_pose'], name='grasp_pose', path=dataset_path)
-    info_dataset = PickleDataset(name='info', path=dataset_path)
-    trajectory_dataset = NPZDataset(keywords=['trajectory'], name='trajectory',
-                                    path=dataset_path)
-    datasets = {'color': color_dataset,
-                'camera_config': camera_config_dataset,
-                'grasp_pose': grasp_pose_dataset,
-                'info': info_dataset,
-                'trajectory': trajectory_dataset}
-    synchronized_dataset = SynchronizedDatasets(datasets)
-    logger.info(f"Dataset {dataset_path} loaded with {len(synchronized_dataset)} samples")
-    return synchronized_dataset
+# def load_dataset(n_perspectives, path, dataset_type='train'):
+#     dataset_path = f'{path}/{dataset_type}'
+#     color_dataset = ColorDataset(name='color', n_perspectives=n_perspectives,
+#                                  path=dataset_path)
+#     camera_config_dataset = MNPZDataset(keywords=['intrinsics', 'pose'], name='camera_config',
+#                                         path=dataset_path,
+#                                         n_samples=n_perspectives)
+#     grasp_pose_dataset = NPZDataset(keywords=['grasp_pose'], name='grasp_pose', path=dataset_path)
+#     info_dataset = PickleDataset(name='info', path=dataset_path)
+#     trajectory_dataset = NPZDataset(keywords=['trajectory'], name='trajectory',
+#                                     path=dataset_path)
+#     datasets = {'color': color_dataset,
+#                 'camera_config': camera_config_dataset,
+#                 'grasp_pose': grasp_pose_dataset,
+#                 'info': info_dataset,
+#                 'trajectory': trajectory_dataset}
+#     synchronized_dataset = SynchronizedDatasets(datasets)
+#     logger.info(f"Dataset {dataset_path} loaded with {len(synchronized_dataset)} samples")
+#     return synchronized_dataset
 
 
-def load_dataset_baseline(n_perspectives, path, dataset_type='train'):
-    dataset_path = f'{path}/{dataset_type}'
-    color_dataset = ColorDataset(name='color', n_perspectives=n_perspectives,
-                                 path=dataset_path)
-    camera_config_dataset = MNPZDataset(keywords=['intrinsics', 'pose'], name='camera_config',
-                                        path=dataset_path,
-                                        n_samples=n_perspectives)
-    info_dataset = PickleDataset(name='info', path=dataset_path)
-    grasp_pose_dataset = NPZDataset(keywords=['grasp_pose'], name='grasp_pose', path=dataset_path)
-    datasets = {
-        'color': color_dataset,
-        'camera_config': camera_config_dataset,
-        'info': info_dataset,
-        'grasp_pose': grasp_pose_dataset
-    }
-    synchronized_dataset = SynchronizedDatasets(datasets)
-    logger.info(f"Dataset contains {len(synchronized_dataset)} samples")
-    return synchronized_dataset
+# def load_dataset_baseline(n_perspectives, path, dataset_type='train'):
+#     dataset_path = f'{path}/{dataset_type}'
+#     color_dataset = ColorDataset(name='color', n_perspectives=n_perspectives,
+#                                  path=dataset_path)
+#     camera_config_dataset = MNPZDataset(keywords=['intrinsics', 'pose'], name='camera_config',
+#                                         path=dataset_path,
+#                                         n_samples=n_perspectives)
+#     info_dataset = PickleDataset(name='info', path=dataset_path)
+#     grasp_pose_dataset = NPZDataset(keywords=['grasp_pose'], name='grasp_pose', path=dataset_path)
+#     datasets = {
+#         'color': color_dataset,
+#         'camera_config': camera_config_dataset,
+#         'info': info_dataset,
+#         'grasp_pose': grasp_pose_dataset
+#     }
+#     synchronized_dataset = SynchronizedDatasets(datasets)
+#     logger.info(f"Dataset contains {len(synchronized_dataset)} samples")
+#     return synchronized_dataset
 
 
-def load_dataset_nerf(n_perspectives, path, dataset_type='train'):
-    dataset_path = f'{path}/{dataset_type}'
-    color_dataset = ColorDataset(name='color', n_perspectives=n_perspectives,
-                                 path=dataset_path)
-    camera_config_dataset = MNPZDataset(keywords=['intrinsics', 'pose'], name='camera_config',
-                                        path=dataset_path,
-                                        n_samples=n_perspectives)
-    info_dataset = PickleDataset(name='info', path=dataset_path)
-    datasets = {
-        'color': color_dataset,
-        'camera_config': camera_config_dataset,
-        'info': info_dataset,
-    }
-    synchronized_dataset = SynchronizedDatasets(datasets)
-    logger.info(f"Dataset contains {len(synchronized_dataset)} samples")
-    return synchronized_dataset
+# def load_dataset_nerf(n_perspectives, path, dataset_type='train'):
+#     dataset_path = f'{path}/{dataset_type}'
+#     color_dataset = ColorDataset(name='color', n_perspectives=n_perspectives,
+#                                  path=dataset_path)
+#     camera_config_dataset = MNPZDataset(keywords=['intrinsics', 'pose'], name='camera_config',
+#                                         path=dataset_path,
+#                                         n_samples=n_perspectives)
+#     info_dataset = PickleDataset(name='info', path=dataset_path)
+#     datasets = {
+#         'color': color_dataset,
+#         'camera_config': camera_config_dataset,
+#         'info': info_dataset,
+#     }
+#     synchronized_dataset = SynchronizedDatasets(datasets)
+#     logger.info(f"Dataset contains {len(synchronized_dataset)} samples")
+#     return synchronized_dataset
 
 
 def load_training_progress(eval_after_epochs, model_log_dir, n_epochs):

@@ -11,9 +11,10 @@ from tensorflow_addons.optimizers import MultiOptimizer
 import hydra
 
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
-from lib.mvnerf.model import MVVNeRFRenderer, render_view
+from lib.mvnerf.model_v2 import MVVNeRFRenderer, render_view
 from lib.mvnerf.nerf_utils import WarmupScheduler, load_pretrained_weights
-from util import load_dataset_nerf, init_training_session
+from lib.dataset.utils import load_dataset_nerf
+from util import init_training_session
 
 
 def compile_model(nerf_renderer):
@@ -87,9 +88,9 @@ def main(cfg: DictConfig) -> None:
     logger.add(sys.stderr, level="INFO")
 
     train_dataset = load_dataset_nerf(
-        cfg.dataset.n_perspectives, cfg.dataset.path, dataset_type='train')
+        cfg.dataset.n_perspectives, cfg.dataset.path + '/train')
     valid_dataset = load_dataset_nerf(
-        cfg.dataset.n_perspectives, cfg.dataset.path, dataset_type='valid')
+        cfg.dataset.n_perspectives, cfg.dataset.path + '/valid')
 
     valid_data = {
         'src_colors': [valid_dataset.datasets['color'].read_sample_at_idx(cfg.valid_sample_idx, i) for i in

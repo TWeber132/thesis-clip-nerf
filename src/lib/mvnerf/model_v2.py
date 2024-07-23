@@ -4,7 +4,7 @@ import numpy as np
 import tensorflow as tf
 from einops import rearrange, repeat
 
-from lib.mvnerf.layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures, CombineCLIPVisualV0
+from lib.mvnerf.layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures, CombineCLIPVisualV2
 from lib.mvnerf.nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_projection_features_mv, \
     world_to_camera_direction_vector_mv, sigma_to_alpha, sample_pdf, optimize, get_rays
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
@@ -28,7 +28,7 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.visual_features = VisualFeatures(n_features, original_image_size)
         self.clip_visual = CLIPVisualEncoder()
-        self.combine_clip_visual_features = CombineCLIPVisualV0()
+        self.combine_clip_visual_features = CombineCLIPVisualV2()
 
         self.n_samples = n_samples
         self.n_rays_train = n_rays_train
