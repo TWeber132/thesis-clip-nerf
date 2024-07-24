@@ -450,36 +450,50 @@ class LevelV0(tf.keras.layers.Layer):
         return x
 
 
-class LevelV1(tf.keras.layers.Layer):
-    def __init__(self, out_shape=(240, 320, 256), name="level"):
+class DoubleConv(tf.keras.layers.Layer):
+    """(convolution => [BN] => ReLU) * 2"""
+
+    def __init__(self, filters, name="double_conv"):
         super().__init__(name=name)
-        self.out_shape = out_shape
+        self.conv_1 = tf.keras.layers.Conv2D(
+            filters, kernel_size=3, padding='same', use_bias=False)
+        self.relu_1 = tf.keras.layers.ReLU()
+        self.conv_2 = tf.keras.layers.Conv2D(
+            filters, kernel_size=3, padding='same', use_bias=False)
+        self.relu_2 = tf.keras.layers.ReLU()
+
+    @tf.function(reduce_retracing=True)
+    def call(self, x):
+        tf.print("tracing ... ")
+        print("DoubleConv once")
+        x = self.relu_1(self.bn_1(self.conv_1(x)))
+        x = self.relu_2(self.bn_2(self.conv_2(x)))
+        return x
+
+
+class Up(tf.keras.layers.Layer):
+    def __init__(self, shape, name="level"):
+        super().__init__(name=name)
+        self.shape = shape
 
         self.resize = tf.keras.layers.Resizing(
-            out_shape[0], out_shape[1], interpolation='bilinear')
-        self.pre_conv = tf.keras.layers.Conv2D(
-            filters=self.out_shape[2], kernel_size=1, use_bias=False)
-        self.post_conv = tf.keras.layers.Conv2D(
-            filters=self.out_shape[2], kernel_size=1, use_bias=False)
-
-        self.clip_feature_extractor = CLIPFeatureExtraction(shape=out_shape)
-        self.clip_reg_loss = tf.keras.losses.CategoricalCrossentropy()
+            self.shape[0], self.shape[1], interpolation='bilinear')
+        self.upsample = tf.keras.layers.UpSampling2D(
+            size=(2, 2), interpolation='bilinear')
+        self.double_conv = DoubleConv(filters=self.shape[2])
+        self.conv_3 = tf.keras.layers.Conv2D(
+            filters=self.shape[2], kernel_size=1, padding='same', use_bias=False)
 
     @tf.function(reduce_retracing=True)
     def call(self, inputs):
-        clip_true = inputs[0]
+        clip_bx = inputs[0]
         clip_x = inputs[1]
-        vis = inputs[2]
 
-        clip_x = self.resize(self.pre_conv(clip_x))  # [(BN) h w 256]
-        vis = self.resize(vis)  # [(BN) h w 256]
-        x = tf.concat([clip_x, vis], axis=-1)  # [(BN) h w 512]
-        x = self.post_conv(x)  # [(BN) h w 256]
-        clip_pred = self.clip_feature_extractor(x)
-        loss = self.clip_reg_loss(clip_true, clip_pred)
-        # Prevent the layer from ignoring the CLIP features and focus on vis
-        self.add_loss(loss)
-        return x
+        clip_bx = self.upsample(clip_bx)
+        clip_x = self.resize(clip_x)
+        clip = tf.concat([clip_bx, clip_x], axis=-1)
+        clip = self.double_conv(clip)
+        return clip
 
 
 class CLIPFeatureExtraction(tf.keras.layers.Layer):
@@ -498,17 +512,40 @@ class CLIPFeatureExtraction(tf.keras.layers.Layer):
         return self.flatten(self.max_pool(inputs))
 
 
+class ConvFusion(tf.keras.layers.Layer):
+    def __init__(self, filters, name="fusion_conv"):
+        super().__init__(name=name)
+        self.conv = tf.keras.layers.Conv2D(
+            filters=filters, kernel_size=1, use_bias=False)
+        self.relu = tf.keras.layers.ReLU()
+
+    @tf.function(reduce_retracing=True)
+    def call(self, inputs):
+        x1, x2 = inputs
+        x = tf.concat([x1, x2], axis=-1)    # [B, H, W, 2C]
+        x = self.relu(x)
+        x = self.conv(x)                    # [B, H, W, C]
+        return x
+
+
 class CombineCLIPVisualV3(tf.keras.layers.Layer):
     def __init__(self, name="combine_clip_visual"):
         super().__init__(name=name)
-        shape_level_1 = (240, 320, 256)
-        shape_level_2 = (120, 160, 256)
-        shape_level_3 = (60, 80, 256)
-        shape_level_4 = (30, 40, 256)
-        self.level_1 = LevelV1(out_shape=shape_level_1)
-        self.level_2 = LevelV1(out_shape=shape_level_2)
-        self.level_3 = LevelV1(out_shape=shape_level_3)
-        self.level_4 = LevelV1(out_shape=shape_level_4)
+
+        self.resize_1 = tf.keras.layers.Resizing(
+            120, 160, interpolation='bilinear')
+        self.resize_2 = tf.keras.layers.Resizing(
+            60, 80, interpolation='bilinear')
+        self.resize_3 = tf.keras.layers.Resizing(
+            30, 40, interpolation='bilinear')
+        self.conv = tf.keras.layers.Conv2D(
+            1024, kernel_size=3, padding='same', use_bias=False, activation='relu')
+        self.conv_fusion_1 = ConvFusion(filters=512)
+        self.conv_fusion_2 = ConvFusion(filters=256)
+        self.conv_fusion_3 = ConvFusion(filters=256)
+        self.up_1 = Up(shape=(60, 80, 512))
+        self.up_2 = Up(shape=(120, 160, 256))
+        self.up_3 = Up(shape=(240, 320, 256))
 
     @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
                                    tf.TensorSpec(
@@ -522,22 +559,28 @@ class CombineCLIPVisualV3(tf.keras.layers.Layer):
                                    tf.TensorSpec(shape=(None, 240, 320, 256), dtype=tf.float32, name="visual_features"))])
     def call(self, inputs):
         clip_outputs = inputs[0]
-        vis = inputs[1]                             # [(BN) 480 640 256]
-        clip_features = clip_outputs[0]             # [(BN) 1024]
-        clip_1 = clip_outputs[1]                    # [(BN) 56 56 256]
-        clip_2 = clip_outputs[2]                    # [(BN) 28 28 512]
-        clip_3 = clip_outputs[3]                    # [(BN) 14 14 1024]
-        clip_4 = clip_outputs[4]                    # [(BN) 7 7 2048]
+        vis = inputs[1]                             # [(BN) 240 320 256]
+        vis_1 = self.resize_1(vis)                  # [(BN) 120 160 256]
+        vis_2 = self.resize_2(vis)                  # [(BN) 60 80 256]
+        _clip_features = clip_outputs[0]            # [(BN) 1024]
+        clip_l1 = clip_outputs[1]                   # [(BN) 56 56 256]
+        clip_l2 = clip_outputs[2]                   # [(BN) 28 28 512]
+        clip_l3 = clip_outputs[3]                   # [(BN) 14 14 1024]
+        clip_l4 = clip_outputs[4]                   # [(BN) 7 7 2048]
 
-        x_level_1 = self.level_1(
-            (clip_features, clip_1, vis))     # [(BN) 240 320 256]
-        x_level_2 = self.level_2(
-            (clip_features, clip_2, vis))     # [(BN) 120 160 256]
-        x_level_3 = self.level_3(
-            (clip_features, clip_3, vis))     # [(BN) 60 80 256]
-        x_level_4 = self.level_4(
-            (clip_features, clip_4, vis))     # [(BN) 30 40 256]
-        return x_level_1, x_level_2, x_level_3, x_level_4
+        x_4 = self.conv(self.resize_3(clip_l4))     # [(BN) 30, 40, 1024]
+        # Fusion: clip | vis => 1 | -
+        x_4f = x_4                                  # [(BN) 30, 40, 1024]
+        x_3 = self.up_1((x_4f, clip_l3))            # [(BN) 60 80 512]
+        # Fusion: clip | vis => 2 | 1
+        x_3f = self.conv_fusion_1((x_3, vis_2))     # [(BN) 60 80 512]
+        x_2 = self.up_2((x_3f, clip_l2))            # [(BN) 120 160 256]
+        # Fusion: clip | vis => 1 | 1
+        x_2f = self.conv_fusion_2((x_2, vis_1))     # [(BN) 120 160 256]
+        x_1 = self.up_3((x_2f, clip_l1))            # [(BN) 240 320 128]
+        # Fusion: clip | vis => 1 | 2
+        x_1f = self.conv_fusion_3((x_1, vis))       # [(BN) 240 320 256]
+        return x_1f, x_2, x_3, x_4
 
 
 class CombineCLIPVisualV2(tf.keras.layers.Layer):
