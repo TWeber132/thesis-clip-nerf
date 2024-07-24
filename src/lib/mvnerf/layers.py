@@ -451,8 +451,6 @@ class LevelV0(tf.keras.layers.Layer):
 
 
 class DoubleConv(tf.keras.layers.Layer):
-    """(convolution => [BN] => ReLU) * 2"""
-
     def __init__(self, filters, name="double_conv"):
         super().__init__(name=name)
         self.conv_1 = tf.keras.layers.Conv2D(
@@ -464,10 +462,8 @@ class DoubleConv(tf.keras.layers.Layer):
 
     @tf.function(reduce_retracing=True)
     def call(self, x):
-        tf.print("tracing ... ")
-        print("DoubleConv once")
-        x = self.relu_1(self.bn_1(self.conv_1(x)))
-        x = self.relu_2(self.bn_2(self.conv_2(x)))
+        x = self.relu_1(self.conv_1(x))
+        x = self.relu_2(self.conv_2(x))
         return x
 
 
