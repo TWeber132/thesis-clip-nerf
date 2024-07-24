@@ -413,12 +413,6 @@ class Readout(tf.keras.Model):
 
 class Level(tf.keras.layers.Layer):
     def __init__(self, downscale=1, vis_size=(240, 320), filters=256, name="level"):
-        # super().__init__(name=name)
-        return LevelV0(downscale=downscale, vis_size=vis_size, filters=filters, name=name)
-
-
-class LevelV0(tf.keras.layers.Layer):
-    def __init__(self, downscale=1, vis_size=(240, 320), filters=256, name="level"):
         super().__init__(name=name)
         self.vis_size = vis_size
         self.filters = filters
@@ -495,8 +489,8 @@ class Up(tf.keras.layers.Layer):
 class CLIPFeatureExtraction(tf.keras.layers.Layer):
     def __init__(self, shape=(240, 320, 256), name="clip_feature_extraction"):
         super().__init__(name=name)
-        assert shape[3] == 256, f"Expected 256 input channels but got {shape[3]} which does not lead to 1024 output channels."
-        pool_size = (shape[1] // 2, shape[2] // 2)
+        assert shape[2] == 256, f"Expected 256 input channels but got {shape[3]} which does not lead to 1024 output channels."
+        pool_size = (shape[0] // 2, shape[1] // 2)
 
         # 4 features per feature map
         self.max_pool = tf.keras.layers.MaxPool2D(
