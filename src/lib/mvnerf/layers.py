@@ -518,8 +518,36 @@ class ConvFusion(tf.keras.layers.Layer):
         return x
 
 
-class CombineCLIPVisualV3(tf.keras.layers.Layer):
-    def __init__(self, name="combine_clip_visual"):
+class Tile(tf.keras.layers.Layer):
+    def __init__(self, shape=(240, 320), filters=256, use_dense=True, name="tile", ):
+        super().__init__(name=name)
+
+        self.shape = shape
+        self.dense = tf.keras.layers.Dense(
+            units=filters, use_bias=False) if use_dense else Slice(filters)
+
+    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_textuals")])
+    def call(self, inputs):
+        x = self.dense(inputs)
+        x = tf.expand_dims(tf.expand_dims(x, axis=1), axis=1)  # [(BN) 1 1 F]
+        x = tf.repeat(x, repeats=self.shape[0], axis=1)  # [(BN) H 1 F]
+        x = tf.repeat(x, repeats=self.shape[1], axis=2)  # [(BN) H W F]
+        return x
+
+
+class Slice(tf.keras.layers.Layer):
+    def __init__(self, begin=0, len=256, dense=True, name="slice", ):
+        super().__init__(name=name)
+
+        self.begin = begin
+        self.len = len
+
+    def call(self, inputs):
+        return tf.slice(inputs, self.begin, self.len)
+
+
+class CombineCLIPVisualV3(tf.keras.Model):
+    def __init__(self, use_dense=False, name="combine_clip_visual"):
         super().__init__(name=name)
 
         self.resize_1 = tf.keras.layers.Resizing(
@@ -530,14 +558,17 @@ class CombineCLIPVisualV3(tf.keras.layers.Layer):
             30, 40, interpolation='bilinear')
         self.conv = tf.keras.layers.Conv2D(
             1024, kernel_size=3, padding='same', use_bias=False, activation='relu')
-        self.conv_fusion_1 = ConvFusion(filters=512)
-        self.conv_fusion_2 = ConvFusion(filters=256)
-        self.conv_fusion_3 = ConvFusion(filters=256)
+        self.tile_1 = Tile((30, 40), filtes=1024, use_dense=use_dense)
         self.up_1 = Up(shape=(60, 80, 512))
+        self.tile_2 = Tile((60, 80), filtes=512, use_dense=use_dense)
+        self.conv_fusion_1 = ConvFusion(filters=512)
         self.up_2 = Up(shape=(120, 160, 256))
+        self.tile_3 = Tile((120, 160), filtes=256, use_dense=use_dense)
+        self.conv_fusion_2 = ConvFusion(filters=256)
         self.up_3 = Up(shape=(240, 320, 256))
+        self.conv_fusion_3 = ConvFusion(filters=256)
 
-    @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
+    @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_visuals"),
                                    tf.TensorSpec(
                                        shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
                                    tf.TensorSpec(
@@ -546,25 +577,34 @@ class CombineCLIPVisualV3(tf.keras.layers.Layer):
                                        shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
                                    tf.TensorSpec(
                                        shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
-                                   tf.TensorSpec(shape=(None, 240, 320, 256), dtype=tf.float32, name="visual_features"))])
+                                   tf.TensorSpec(
+                                       shape=(None, 240, 320, 256), dtype=tf.float32, name="visual_features"),
+                                   tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_textuals"))])
     def call(self, inputs):
         clip_outputs = inputs[0]
         vis = inputs[1]                             # [(BN) 240 320 256]
+        clip_textuals = inputs[2]                   # [(BN) 1024]
         vis_1 = self.resize_1(vis)                  # [(BN) 120 160 256]
         vis_2 = self.resize_2(vis)                  # [(BN) 60 80 256]
-        _clip_features = clip_outputs[0]            # [(BN) 1024]
+        _clip_visuals = clip_outputs[0]             # [(BN) 1024]
         clip_l1 = clip_outputs[1]                   # [(BN) 56 56 256]
         clip_l2 = clip_outputs[2]                   # [(BN) 28 28 512]
         clip_l3 = clip_outputs[3]                   # [(BN) 14 14 1024]
         clip_l4 = clip_outputs[4]                   # [(BN) 7 7 2048]
 
         x_4 = self.conv(self.resize_3(clip_l4))     # [(BN) 30, 40, 1024]
+        t_4 = self.tile_1(clip_textuals)            # [(BN) 30, 40, 1024]
+        x_4 = tf.math.multiply(x_4, t_4)
         # Fusion: clip | vis => 1 | -
         x_4f = x_4                                  # [(BN) 30, 40, 1024]
         x_3 = self.up_1((x_4f, clip_l3))            # [(BN) 60 80 512]
+        t_3 = self.tile_2(clip_textuals)            # [(BN) 60 80 512]
+        x_3 = tf.math.multiply(x_3, t_3)
         # Fusion: clip | vis => 2 | 1
         x_3f = self.conv_fusion_1((x_3, vis_2))     # [(BN) 60 80 512]
         x_2 = self.up_2((x_3f, clip_l2))            # [(BN) 120 160 256]
+        t_2 = self.tile_3(clip_textuals)            # [(BN) 120 160 256]
+        x_2 = tf.math.multiply(x_2, t_2)
         # Fusion: clip | vis => 1 | 1
         x_2f = self.conv_fusion_2((x_2, vis_1))     # [(BN) 120 160 256]
         x_1 = self.up_3((x_2f, clip_l1))            # [(BN) 240 320 128]

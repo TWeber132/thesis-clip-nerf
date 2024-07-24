@@ -40,20 +40,3 @@ class GraspReadout(tf.keras.Model):
             combined_activations, 'b np n5 d -> b np (n5 d)')
         output = self.readout(combined_activations)[..., 0]
         return output
-
-
-class Tile(tf.keras.Model):
-    def __init__(self, shape=(None, 240, 320, 256), name="tile", ):
-        super().__init__(name=name)
-
-        self.shape = shape
-        self.dense = tf.keras.layers.Dense(units=self.shape[3],
-                                           use_bias=False)
-
-    @tf.function(input_signature=[tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_textuals")])
-    def call(self, inputs):
-        x = self.dense(inputs)
-        x = tf.expand_dims(tf.expand_dims(x, axis=1), axis=1)  # [(BN) 1 1 256]
-        x = tf.repeat(x, repeats=self.shape[1], axis=1)  # [(BN) 240 1 256]
-        x = tf.repeat(x, repeats=self.shape[2], axis=2)  # [(BN) 240 320 256]
-        return x

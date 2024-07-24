@@ -28,8 +28,8 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.visual_features = VisualFeatures(n_features, original_image_size)
         self.clip_visual = CLIPVisualEncoder()
-        self.combine_clip_visual_features = CombineCLIPVisualV3()
-        self.up_sample = tf.keras.layers.UpSampling2D(
+        self.combine_clip_visual = CombineCLIPVisualV3()
+        self.up = tf.keras.layers.UpSampling2D(
             size=2, interpolation='bilinear')
 
         self.n_samples = n_samples
@@ -79,11 +79,12 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         # Combine CLIP and VISUAL
         clip_images = preprocess_tf(src_images)
-        clip_outputs = self.clip_visual(clip_images)
-        visual_features = self.encode(src_images)
-        outputs = self.combine_clip_visual_features(  # [(BN) 240 320 256] [(BN) 120 160 256] [(BN) 60 80 512] [(BN) 30 40 1024]
-            (clip_outputs, visual_features))
-        combined_features = self.up_sample(outputs[0])  # [(BN) 480 640 256]
+        clip_visuals = self.clip_visual(clip_images)
+        visual_features = self.encode(src_images)  # [(BN) 240 320 256]
+        clip_textuals = tf.ones([self.batch_size, 1024])  # [(BN) 1024]
+        outputs = self.combine_clip_visual(  # [(BN) 240 320 256] [(BN) 120 160 256] [(BN) 60 80 512] [(BN) 30 40 1024]
+            (clip_visuals, visual_features, clip_textuals))
+        combined_features = self.up(outputs[0])  # [(BN) 480 640 256]
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', b=self.batch_size)
         return self._call(inputs, self.n_rays_train, self.batch_size, combined_features)
@@ -209,6 +210,8 @@ class MVVNeRFRenderer(tf.keras.Model):
         self.fine_readout.save_weights(fine_readout_path)
         visual_features_path = f'{path}_visual_features'
         self.visual_features.save_weights(visual_features_path)
+        combine_clip_visual_path = f'{path}_combine_clip_visual'
+        self.combine_clip_visual.save_weights(combine_clip_visual_path)
 
     def load(self, path, old=False):
         coarse_embedding_path = f'{path}_coarse_embedding'
@@ -216,6 +219,7 @@ class MVVNeRFRenderer(tf.keras.Model):
         fine_embedding_path = f'{path}_fine_embedding'
         fine_readout_path = f'{path}_fine_readout'
         visual_features_path = f'{path}_visual_features'
+        combine_clip_visual_path = f'{path}_combine_clip_visual'
         # check if <path>.index exists for all paths above
         if not os.path.exists(coarse_embedding_path + '.index'):
             return False
@@ -227,12 +231,15 @@ class MVVNeRFRenderer(tf.keras.Model):
             return False
         if not os.path.exists(visual_features_path + '.index'):
             return False
+        if not os.path.exists(combine_clip_visual_path + '.index'):
+            return False
 
         self.coarse_embedding.load_weights(coarse_embedding_path)
         self.coarse_readout.load_weights(coarse_readout_path)
         self.fine_embedding.load_weights(fine_embedding_path)
         self.fine_readout.load_weights(fine_readout_path)
         self.visual_features.load_weights(visual_features_path)
+        self.combine_clip_visual.load_weights(combine_clip_visual_path)
         return True
 
 
