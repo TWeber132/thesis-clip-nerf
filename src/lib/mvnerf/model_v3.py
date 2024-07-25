@@ -29,8 +29,6 @@ class MVVNeRFRenderer(tf.keras.Model):
         self.visual_features = VisualFeatures(n_features, original_image_size)
         self.clip_visual = CLIPVisualEncoder()
         self.combine_clip_visual = CombineCLIPVisualV3()
-        self.up = tf.keras.layers.UpSampling2D(
-            size=2, interpolation='bilinear')
 
         self.n_samples = n_samples
         self.n_rays_train = n_rays_train
@@ -260,7 +258,7 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
     visual_features = model.encode(src_images)
     clip_images = preprocess_tf(src_images)
     clip_outputs = model.clip_visual(clip_images)
-    clip_textuals = tf.ones([1, 1024])  # [(BN) 1024]
+    clip_textuals = tf.ones([tf.shape(src_images)[0], 1024])  # [(BN) 1024]
     combined_features = model.combine_clip_visual((
         clip_outputs, visual_features, clip_textuals))
     combined_features = rearrange(

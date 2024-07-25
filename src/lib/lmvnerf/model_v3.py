@@ -281,18 +281,9 @@ class LanguageNeRF(tf.keras.Model):
         clip_images = preprocess_tf(src_images)
         clip_outputs = self.clip_visual(clip_images)
         visual_features = self.visual_features(src_images)
+        clip_textuals = self.clip_textual(clip_tokens)
         combined_features = self.combine_clip_visual_features(
-            (clip_outputs, visual_features))
-        clip_textuals = self.clip_textual(clip_tokens)  # [BN 1024]
-        clip_textuals_tiled = tf.expand_dims(
-            tf.expand_dims(clip_textuals, axis=1), axis=1)
-        clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
-            combined_features)[1], axis=1)  # [BN h w 1024]
-        clip_textuals_tiled = tf.repeat(clip_textuals_tiled, repeats=tf.shape(
-            combined_features)[2], axis=2)  # [BN h w 1024]
-        clip_textuals_tiled = clip_textuals_tiled[..., :256]
-        combined_features = tf.math.multiply(
-            combined_features, clip_textuals_tiled)  # [BN h w 256]
+            (clip_outputs, visual_features, clip_textuals))
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
         transforms = self.compute_matrices()
