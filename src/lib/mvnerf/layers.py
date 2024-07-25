@@ -524,6 +524,7 @@ class MultiplyFusion(tf.keras.layers.Layer):
 
         self.tile = Tile(shape=shape, filters=filters, use_dense=use_dense)
 
+    @tf.function(reduce_retracing=True)
     def call(self, inputs):
         clip_x = inputs[0]
         clip_textuals = inputs[1]
@@ -549,14 +550,14 @@ class Tile(tf.keras.layers.Layer):
 
 
 class Slice(tf.keras.layers.Layer):
-    def __init__(self, begin=0, len=256, dense=True, name="slice", ):
+    def __init__(self, len=256, name="slice"):
         super().__init__(name=name)
 
-        self.begin = begin
-        self.len = len
+        self.begin = [0, 0]
+        self.end = [-1, len]
 
     def call(self, inputs):
-        return tf.slice(inputs, self.begin, self.len)
+        return tf.slice(inputs, self.begin, self.end)
 
 
 class CombineCLIPVisualV3(tf.keras.Model):
@@ -572,14 +573,14 @@ class CombineCLIPVisualV3(tf.keras.Model):
         self.conv = tf.keras.layers.Conv2D(
             1024, kernel_size=3, padding='same', use_bias=False, activation='relu')
         self.multiply_fusion_1 = MultiplyFusion(
-            (30, 40), filtes=1024, use_dense=use_dense)
+            (30, 40), filters=1024, use_dense=use_dense)
         self.up_1 = Up(shape=(60, 80, 512))
         self.multiply_fusion_2 = MultiplyFusion(
-            (60, 80), filtes=512, use_dense=use_dense)
+            (60, 80), filters=512, use_dense=use_dense)
         self.conv_fusion_1 = ConvFusion(filters=512)
         self.up_2 = Up(shape=(120, 160, 256))
         self.multiply_fusion_3 = MultiplyFusion(
-            (120, 160), filtes=256, use_dense=use_dense)
+            (120, 160), filters=256, use_dense=use_dense)
         self.conv_fusion_2 = ConvFusion(filters=256)
         self.up_3 = Up(shape=(240, 320, 256))
         self.conv_fusion_3 = ConvFusion(filters=256)
@@ -600,10 +601,10 @@ class CombineCLIPVisualV3(tf.keras.Model):
                                    tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_textuals"))])
     def call(self, inputs):
         clip_outputs = inputs[0]
-        vis = inputs[1]                             # [(BN) 240 320 256]
+        visual_features = inputs[1]                 # [(BN) 240 320 256]
         clip_textuals = inputs[2]                   # [(BN) 1024]
-        vis_1 = self.resize_1(vis)                  # [(BN) 120 160 256]
-        vis_2 = self.resize_2(vis)                  # [(BN) 60 80 256]
+        vis_1 = self.resize_1(visual_features)      # [(BN) 120 160 256]
+        vis_2 = self.resize_2(visual_features)      # [(BN) 60 80 256]
         _clip_visuals = clip_outputs[0]             # [(BN) 1024]
         clip_l1 = clip_outputs[1]                   # [(BN) 56 56 256]
         clip_l2 = clip_outputs[2]                   # [(BN) 28 28 512]
@@ -611,19 +612,19 @@ class CombineCLIPVisualV3(tf.keras.Model):
         clip_l4 = clip_outputs[4]                   # [(BN) 7 7 2048]
 
         x = self.conv(self.resize_3(clip_l4))       # [(BN) 30, 40, 1024]
-        x = self.multiply_fusion_1(x, clip_textuals)  # [(BN) 30, 40, 1024]
+        x = self.multiply_fusion_1((x, clip_textuals))  # [(BN) 30, 40, 1024]
         # No fusion: clip | vis => 1 | -
         x = self.up_1((x, clip_l3))                 # [(BN) 60 80 512]
-        x = self.multiply_fusion_2(x, clip_textuals)  # [(BN) 60 80 512]
+        x = self.multiply_fusion_2((x, clip_textuals))  # [(BN) 60 80 512]
         # Fusion: clip | vis => 2 | 1
         x = self.conv_fusion_1((x, vis_2))          # [(BN) 60 80 512]
         x = self.up_2((x, clip_l2))                 # [(BN) 120 160 256]
-        x = self.multiply_fusion_3(x, clip_textuals)  # [(BN) 120 160 256]
+        x = self.multiply_fusion_3((x, clip_textuals))  # [(BN) 120 160 256]
         # Fusion: clip | vis => 1 | 1
         x = self.conv_fusion_2((x, vis_1))          # [(BN) 120 160 256]
         x = self.up_3((x, clip_l1))                 # [(BN) 240 320 128]
         # Fusion: clip | vis => 1 | 2
-        x = self.conv_fusion_3((x, vis))            # [(BN) 240 320 256]
+        x = self.conv_fusion_3((x, visual_features))  # [(BN) 240 320 256]
         x = self.up_sample(x)                       # [(BN) 480 640 256]
         return x
 

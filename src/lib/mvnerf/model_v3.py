@@ -79,11 +79,11 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         # Combine CLIP and VISUAL
         clip_images = preprocess_tf(src_images)
-        clip_visuals = self.clip_visual(clip_images)
+        clip_outputs = self.clip_visual(clip_images)
         visual_features = self.encode(src_images)  # [(BN) 240 320 256]
         clip_textuals = tf.ones([self.batch_size, 1024])  # [(BN) 1024]
         combined_features = self.combine_clip_visual(  # [(BN) 480 640 256] [(BN) 120 160 256] [(BN) 60 80 512] [(BN) 30 40 1024]
-            (clip_visuals, visual_features, clip_textuals))
+            (clip_outputs, visual_features, clip_textuals))
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', b=self.batch_size)
         return self._call(inputs, self.n_rays_train, self.batch_size, combined_features)
@@ -260,9 +260,9 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
     visual_features = model.encode(src_images)
     clip_images = preprocess_tf(src_images)
     clip_outputs = model.clip_visual(clip_images)
-    outputs = model.combine_clip_visual_features((
-        clip_outputs, visual_features))
-    combined_features = model.up_sample(outputs[0])  # [(BN) 480 640 256]
+    clip_textuals = tf.ones([1, 1024])  # [(BN) 1024]
+    combined_features = model.combine_clip_visual((
+        clip_outputs, visual_features, clip_textuals))
     combined_features = rearrange(
         combined_features, '(b n) h w c -> b n h w c', b=1)
 
