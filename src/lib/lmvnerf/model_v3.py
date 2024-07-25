@@ -56,8 +56,6 @@ class LanguageNeRF(tf.keras.Model):
         self.clip_textual = CLIPTextualEncoder()
         self.grasp_readout = GraspReadout(use_bias=True)
         self.combine_clip_visual = CombineCLIPVisualV3(use_dense=True)
-        self.up = tf.keras.layers.UpSampling2D(
-            size=2, interpolation='bilinear')
 
         self.mse = tf.keras.losses.MeanSquaredError()
         self.cosine_similarity = tf.keras.losses.CosineSimilarity(axis=-1)
@@ -184,8 +182,6 @@ class LanguageNeRF(tf.keras.Model):
         clip_textuals = self.clip_textual(clip_tokens)      # [(BN) 1024]
         combined_features = self.combine_clip_visual(
             (clip_visuals, visual_features, clip_textuals))
-        combined_features = self.up(                        # [(BN) 480 640 256]
-            combined_features)
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
         # transforms = t_q_to_h_matrix(self.translations, self.quaternions)
