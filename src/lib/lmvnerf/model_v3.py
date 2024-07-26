@@ -55,7 +55,8 @@ class LanguageNeRF(tf.keras.Model):
         self.clip_visual = CLIPVisualEncoder()
         self.clip_textual = CLIPTextualEncoder()
         self.grasp_readout = GraspReadout(use_bias=True)
-        self.combine_clip_visual = CombineCLIPVisualV3(use_dense=True)
+        self.combine_clip_visual = CombineCLIPVisualV3(
+            use_dense=True, activation='elu')
 
         self.mse = tf.keras.losses.MeanSquaredError()
         self.cosine_similarity = tf.keras.losses.CosineSimilarity(axis=-1)

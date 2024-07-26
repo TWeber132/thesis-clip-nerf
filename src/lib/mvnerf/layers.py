@@ -445,14 +445,20 @@ class Level(tf.keras.layers.Layer):
 
 
 class DoubleConv(tf.keras.layers.Layer):
-    def __init__(self, filters, name="double_conv"):
+    def __init__(self, filters, activation='relu', name="double_conv"):
         super().__init__(name=name)
         self.conv_1 = tf.keras.layers.Conv2D(
             filters, kernel_size=3, padding='same', use_bias=False)
-        self.relu_1 = tf.keras.layers.ReLU()
         self.conv_2 = tf.keras.layers.Conv2D(
             filters, kernel_size=3, padding='same', use_bias=False)
-        self.relu_2 = tf.keras.layers.ReLU()
+        if activation == 'relu':
+            self.relu_1 = tf.keras.layers.ReLU()
+            self.relu_2 = tf.keras.layers.ReLU()
+        elif activation == 'elu':
+            self.relu_1 = tf.keras.layers.ELU()
+            self.relu_2 = tf.keras.layers.ELU()
+        else:
+            raise ValueError(f'activation {activation} not supported')
 
     @tf.function(reduce_retracing=True)
     def call(self, x):
@@ -462,14 +468,14 @@ class DoubleConv(tf.keras.layers.Layer):
 
 
 class Up(tf.keras.layers.Layer):
-    def __init__(self, shape, filters, name="level"):
+    def __init__(self, shape, filters, activation='relu', name="level"):
         super().__init__(name=name)
 
         self.resize = tf.keras.layers.Resizing(
             shape[0], shape[1], interpolation='bilinear')
         self.upsample = tf.keras.layers.UpSampling2D(
             size=(2, 2), interpolation='bilinear')
-        self.double_conv = DoubleConv(filters=filters)
+        self.double_conv = DoubleConv(filters=filters, activation=activation)
         self.conv_3 = tf.keras.layers.Conv2D(
             filters=filters, kernel_size=1, padding='same', use_bias=False)
 
@@ -561,7 +567,7 @@ class Slice(tf.keras.layers.Layer):
 
 
 class CombineCLIPVisualV3(tf.keras.Model):
-    def __init__(self, use_dense=False, name="combine_clip_visual"):
+    def __init__(self, use_dense=False, activation='relu', name="combine_clip_visual"):
         super().__init__(name=name)
 
         self.resize_1 = tf.keras.layers.Resizing(
@@ -571,18 +577,18 @@ class CombineCLIPVisualV3(tf.keras.Model):
         self.resize_3 = tf.keras.layers.Resizing(
             30, 40, interpolation='bilinear')
         self.conv = tf.keras.layers.Conv2D(
-            1024, kernel_size=3, padding='same', use_bias=False, activation='relu')
+            1024, kernel_size=3, padding='same', use_bias=False, activation=activation)
         self.multiply_fusion_1 = MultiplyFusion(
-            (30, 40), filters=1024, use_dense=use_dense)
+            (30, 40), filters=1024, use_dense=use_dense, activation=activation)
         self.up_1 = Up(shape=(60, 80), filters=512)
         self.multiply_fusion_2 = MultiplyFusion(
             (60, 80), filters=512, use_dense=use_dense)
         self.conv_fusion_1 = ConvFusion(filters=512)
-        self.up_2 = Up(shape=(120, 160), filters=256)
+        self.up_2 = Up(shape=(120, 160), filters=256, activation=activation)
         self.multiply_fusion_3 = MultiplyFusion(
             (120, 160), filters=256, use_dense=use_dense)
         self.conv_fusion_2 = ConvFusion(filters=256)
-        self.up_3 = Up(shape=(240, 320), filters=256)
+        self.up_3 = Up(shape=(240, 320), filters=256, activation=activation)
         self.conv_fusion_3 = ConvFusion(filters=256)
         self.up_sample = tf.keras.layers.UpSampling2D(
             size=2, interpolation='bilinear')
