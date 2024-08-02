@@ -82,7 +82,8 @@ def load_training_progress(eval_after_epochs, model_log_dir, n_epochs):
 
 def init_training_session(model_log_dir):
     start_epoch = 0
-    training_progress_file = os.path.join(model_log_dir, 'training_progress.json')
+    training_progress_file = os.path.join(
+        model_log_dir, 'training_progress.json')
     if os.path.exists(training_progress_file):
         with open(training_progress_file, 'r') as f:
             training_progress = json.load(f)
@@ -118,8 +119,10 @@ def log_results(epoch, results, wandb_initialized):
         "best_r_error_mean_r": best_r_error_mean[1] / np.pi * 180
     }
 
-    logger.info(f"   Average   {log_dict['mean_r_error_t']}    {log_dict['mean_r_error_r']}")
-    logger.info(f"   Best   {log_dict['best_r_error_mean_t']}    {log_dict['best_r_error_mean_r']}")
+    logger.info(
+        f"   Average   {log_dict['mean_r_error_t']}    {log_dict['mean_r_error_r']}")
+    logger.info(
+        f"   Best   {log_dict['best_r_error_mean_t']}    {log_dict['best_r_error_mean_r']}")
     if wandb_initialized:
         wandb.log(log_dict)
 
@@ -131,22 +134,26 @@ def setup_oracle(plugins, oracle_config):
     return oracle
 
 
-def get_inputs(dataset, sample_idx, n_images, grasp_model):
+def get_inputs(dataset, sample_idx, n_images):  # , grasp_model):
     observations = []
     intrinsics = []
     extrinsics_inv = []
     if n_images == 2:
         for i in range(3, 5):
-            src_img = dataset.datasets['color'].read_sample_at_idx(sample_idx, i)[..., :3] / 255.0
-            camera_config = dataset.datasets['camera_config'].read_sample_at_idx(sample_idx, i)
+            src_img = dataset.datasets['color'].read_sample_at_idx(
+                sample_idx, i)[..., :3] / 255.0
+            camera_config = dataset.datasets['camera_config'].read_sample_at_idx(
+                sample_idx, i)
             src_extr_inv, src_intr = camera_parameters(camera_config)
             observations.append(src_img)
             intrinsics.append(src_intr)
             extrinsics_inv.append(src_extr_inv)
     elif n_images == 3:
         for i in range(0, 3):
-            src_img = dataset.datasets['color'].read_sample_at_idx(sample_idx, i)[..., :3] / 255.0
-            camera_config = dataset.datasets['camera_config'].read_sample_at_idx(sample_idx, i)
+            src_img = dataset.datasets['color'].read_sample_at_idx(
+                sample_idx, i)[..., :3] / 255.0
+            camera_config = dataset.datasets['camera_config'].read_sample_at_idx(
+                sample_idx, i)
             src_extr_inv, src_intr = camera_parameters(camera_config)
             observations.append(src_img)
             intrinsics.append(src_intr)
@@ -157,14 +164,24 @@ def get_inputs(dataset, sample_idx, n_images, grasp_model):
     input_data = [observations.astype(np.float32),
                   intrinsics.astype(np.float32),
                   extrinsics_inv.astype(np.float32)]
-    features = compute_features(input_data[0], grasp_model.visual_features)
-    task_info = dataset.datasets['info'].read_sample(sample_idx)
+    # features = compute_features(input_data[0], grasp_model.visual_features)
+    # task_info = dataset.datasets['info'].read_sample(sample_idx)
+    return input_data  # , features  # , task_info
 
-    return input_data, features, task_info
+
+def get_info(dataset, sample_idx):
+    task_info = dataset.datasets['info'].read_sample(sample_idx)
+    return task_info
+
+
+def get_outputs(dataset, sample_idx):
+    grasp_pose = dataset.datasets['grasp_pose'].read_sample(sample_idx)
+    return grasp_pose
 
 
 def compute_features(images, feature_extractor):
     src_images = rearrange(images, 'b n h w c -> (b n) h w c')
     batched_features = feature_extractor(src_images)
-    batched_features = rearrange(batched_features, '(b n) h w c -> b n h w c', b=images.shape[0])
+    batched_features = rearrange(
+        batched_features, '(b n) h w c -> b n h w c', b=images.shape[0])
     return batched_features
