@@ -2,7 +2,7 @@
 ##                                 Base Image                               ##
 ##############################################################################
 ARG RENDER=base
-FROM tensorflow/tensorflow:2.11.0-gpu as tf-base
+FROM tensorflow/tensorflow:2.11.0-gpu AS tf-base
 USER root
 ENV TZ=Europe/Berlin
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
@@ -10,7 +10,7 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 ##############################################################################
 ##                                 Dependencies                             ##
 ##############################################################################
-FROM tf-base as tf-dependencies
+FROM tf-base AS tf-dependencies
 USER root
 RUN apt update \
   && apt install -y -qq --no-install-recommends \
@@ -46,7 +46,7 @@ USER $USER
 ##############################################################################
 ##                                  User                                    ##
 ##############################################################################
-FROM tf-dependencies as tf-user
+FROM tf-dependencies AS tf-user
 #FROM base-render as user
 
 # install sudo
@@ -72,7 +72,7 @@ CMD ["bash"]
 ##############################################################################
 ##                                 Manipulation Tasks                       ##
 ##############################################################################
-FROM tf-user as tf-manipulation-tasks
+FROM tf-user AS tf-manipulation-tasks
 
 COPY --chown=$USER:$USER ./dependencies /home/$USER/workspace/dependencies
 RUN cd /home/$USER/workspace/dependencies/manipulation_tasks && \
@@ -81,3 +81,16 @@ RUN cd /home/$USER/workspace/dependencies/manipulation_tasks && \
 RUN pip install --no-cache-dir loguru
 RUN pip install --no-cache-dir matplotlib
 RUN pip install hydra-core --upgrade
+
+##############################################################################
+##                                 Simulation                               ##
+##############################################################################
+FROM tf-manipulation-tasks AS tf-gym
+
+RUN pip install --no-cache-dir gym==0.17.3
+RUN pip install --no-cache-dir pybullet>=3.0.4
+RUN pip install --no-cache-dir tdqm
+RUN pip install --no-cache-dir transformers==4.3.2
+RUN pip install --no-cache-dir imageio-ffmpeg
+# RUN pip install --no-cache-dir meshcat>=0.0.18
+# RUN pip install --no-cache-dir kornia==0.5.11
