@@ -2,7 +2,3 @@ defaults:
   - default
   - dataset: trajectory
   - generator_grasp: trajectory
-valid_sample_indices:
-  - 0
-  - 4
-  - 7

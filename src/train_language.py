@@ -7,12 +7,12 @@ from omegaconf import DictConfig
 import hydra
 
 from lib.data_generator.language import LanguageDataGenerator
-from lib.lmvnerf.model import LanguageNeRF
+from lib.lmvnerf.model_v3 import LanguageNeRF
 from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
 from training import train_grasp_model
-from util import setup_oracle, get_inputs
 from lib.dataset.utils import load_dataset_language, load_dataset_goal
+from validation import validate_grasp_model as validate_model
 
 import wandb
 
@@ -87,9 +87,7 @@ def main(cfg: DictConfig) -> None:
                                     workspace_bounds=cfg.generator_grasp.workspace_bounds,
                                     rotation_representation=cfg.grasp_model.rotation_representation)
 
-    # valid_data = [
-    #     get_inputs(valid_dataset, i, int(cfg.validation.grasp_opt_config.optimizer_config.n_images), grasp_model) for i
-    #     in cfg.valid_sample_indices]
+    validate_model(cfg.validation, valid_dataset, grasp_model)
 
     wandb_project_name = cfg.grasp_training.model_path.split('/')[-1]
     wandb_dir = f"{cfg.grasp_training.model_path}/wandb"

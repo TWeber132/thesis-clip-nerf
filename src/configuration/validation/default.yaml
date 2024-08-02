@@ -1,3 +1,9 @@
-defaults:
-  - oracle: grasp
-  - plugins: simple
+valid_sample_indices:
+  - 0
+  - 4
+  - 7
+
+assets_root: ${ws_dir}/src/lib/simulation/environments/assets/
+disp: True  # visualize PyBullet
+shared_memory: False
+task: picking-seen-google-objects-seq

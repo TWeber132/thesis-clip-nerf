@@ -1,1 +1,3 @@
-torch_weights_path: "/home/jovyan/data/storage/transformer_weights/weights.pkl"
+ws_dir: "/home/jovyan/workspace"
+data_dir: "/home/jovyan/data"
+torch_weights_path: "${data_dir}/storage/transformer_weights/weights.pkl"
