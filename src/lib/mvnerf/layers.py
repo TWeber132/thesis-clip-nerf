@@ -508,11 +508,16 @@ class CLIPFeatureExtraction(tf.keras.layers.Layer):
 
 
 class ConvFusion(tf.keras.layers.Layer):
-    def __init__(self, filters, name="conv_fusion"):
+    def __init__(self, filters, activation='relu', name="conv_fusion"):
         super().__init__(name=name)
         self.conv = tf.keras.layers.Conv2D(
             filters=filters, kernel_size=1, use_bias=False)
-        self.relu = tf.keras.layers.ReLU()
+        if activation == 'relu':
+            self.relu = tf.keras.layers.ReLU()
+        elif activation == 'elu':
+            self.relu = tf.keras.layers.ELU()
+        else:
+            raise ValueError(f'activation {activation} not supported')
 
     @tf.function(reduce_retracing=True)
     def call(self, inputs):
@@ -579,17 +584,17 @@ class CombineCLIPVisualV3(tf.keras.Model):
         self.conv = tf.keras.layers.Conv2D(
             1024, kernel_size=3, padding='same', use_bias=False, activation=activation)
         self.multiply_fusion_1 = MultiplyFusion(
-            (30, 40), filters=1024, use_dense=use_dense, activation=activation)
-        self.up_1 = Up(shape=(60, 80), filters=512)
+            (30, 40), filters=1024, use_dense=use_dense)
+        self.up_1 = Up(shape=(60, 80), filters=512, activation=activation)
         self.multiply_fusion_2 = MultiplyFusion(
             (60, 80), filters=512, use_dense=use_dense)
-        self.conv_fusion_1 = ConvFusion(filters=512)
+        self.conv_fusion_1 = ConvFusion(filters=512, activation=activation)
         self.up_2 = Up(shape=(120, 160), filters=256, activation=activation)
         self.multiply_fusion_3 = MultiplyFusion(
             (120, 160), filters=256, use_dense=use_dense)
-        self.conv_fusion_2 = ConvFusion(filters=256)
+        self.conv_fusion_2 = ConvFusion(filters=256, activation=activation)
         self.up_3 = Up(shape=(240, 320), filters=256, activation=activation)
-        self.conv_fusion_3 = ConvFusion(filters=256)
+        self.conv_fusion_3 = ConvFusion(filters=256, activation=activation)
         self.up_sample = tf.keras.layers.UpSampling2D(
             size=2, interpolation='bilinear')
 
