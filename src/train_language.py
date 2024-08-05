@@ -12,7 +12,6 @@ from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
 from training import train_grasp_model
 from lib.dataset.utils import load_dataset_language, load_dataset_goal
-from validation import validate_grasp_model as validate_model
 
 import wandb
 
@@ -87,8 +86,6 @@ def main(cfg: DictConfig) -> None:
                                     **cfg.validation.grasp_opt_config.optimizer_config,
                                     workspace_bounds=cfg.generator_grasp.workspace_bounds,
                                     rotation_representation=cfg.grasp_model.rotation_representation)
-
-    validate_model(cfg.validation, valid_dataset, grasp_model)
 
     wandb_project_name = cfg.grasp_training.model_path.split('/')[-1]
     wandb_dir = f"{cfg.grasp_training.model_path}/wandb"
