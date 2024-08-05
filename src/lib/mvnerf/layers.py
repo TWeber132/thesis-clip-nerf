@@ -588,3 +588,73 @@ class CombineCLIPVisualV3(tf.keras.Model):
         x = self.conv_fusion_3((x, visual_features))  # [(BN) 240 320 256]
         x = self.up_sample(x)                       # [(BN) 480 640 256]
         return x
+
+
+class CombineCLIPVisualV4(tf.keras.Model):
+    def __init__(self, use_dense=False, activation='relu', name="combine_clip_visual"):
+        super().__init__(name=name)
+
+        self.resize_1 = tf.keras.layers.Resizing(
+            120, 160, interpolation='bilinear')
+        self.resize_2 = tf.keras.layers.Resizing(
+            60, 80, interpolation='bilinear')
+        self.resize_3 = tf.keras.layers.Resizing(
+            30, 40, interpolation='bilinear')
+        self.conv = tf.keras.layers.Conv2D(
+            1024, kernel_size=3, padding='same', use_bias=False, activation=activation)
+        self.multiply_fusion_1 = MultiplyFusion(
+            (30, 40), filters=1024, use_dense=use_dense)
+        self.up_1 = Up(shape=(60, 80), filters=512, activation=activation)
+        self.multiply_fusion_2 = MultiplyFusion(
+            (60, 80), filters=512, use_dense=use_dense)
+        self.conv_fusion_1 = ConvFusion(filters=512, activation=activation)
+        self.up_2 = Up(shape=(120, 160), filters=256, activation=activation)
+        self.multiply_fusion_3 = MultiplyFusion(
+            (120, 160), filters=256, use_dense=use_dense)
+        self.conv_fusion_2 = ConvFusion(filters=256, activation=activation)
+        self.up_3 = Up(shape=(240, 320), filters=128, activation=activation)
+        self.conv_fusion_3 = ConvFusion(filters=256, activation=activation)
+        self.up_sample = tf.keras.layers.UpSampling2D(
+            size=2, interpolation='bilinear')
+
+    @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_visuals"),
+                                   tf.TensorSpec(
+                                       shape=(None, 56, 56, 256), dtype=tf.float32, name="clip_layer_1"),
+                                   tf.TensorSpec(
+                                       shape=(None, 28, 28, 512), dtype=tf.float32, name="clip_layer_2"),
+                                   tf.TensorSpec(
+                                       shape=(None, 14, 14, 1024), dtype=tf.float32, name="clip_layer_3"),
+                                   tf.TensorSpec(
+                                       shape=(None, 7, 7, 2048), dtype=tf.float32, name="clip_layer_4")),
+                                   tf.TensorSpec(
+                                       shape=(None, 240, 320, 256), dtype=tf.float32, name="visual_features"),
+                                   tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_textuals"))])
+    def call(self, inputs):
+        clip_outputs = inputs[0]
+        visual_features = inputs[1]                 # [(BN) 240 320 256]
+        clip_textuals = inputs[2]                   # [(BN) 1024]
+        vis_1 = self.resize_1(visual_features)      # [(BN) 120 160 256]
+        vis_2 = self.resize_2(visual_features)      # [(BN) 60 80 256]
+        _clip_visuals = clip_outputs[0]             # [(BN) 1024]
+        clip_l1 = clip_outputs[1]                   # [(BN) 56 56 256]
+        clip_l2 = clip_outputs[2]                   # [(BN) 28 28 512]
+        clip_l3 = clip_outputs[3]                   # [(BN) 14 14 1024]
+        clip_l4 = clip_outputs[4]                   # [(BN) 7 7 2048]
+
+        x = self.conv(self.resize_3(clip_l4))       # [(BN) 30, 40, 1024]
+        x = self.multiply_fusion_1((x, clip_textuals))  # [(BN) 30, 40, 1024]
+        # No fusion: clip | vis => 1 | -
+        x = self.up_1((x, clip_l3))                 # [(BN) 60 80 512]
+        x = self.multiply_fusion_2((x, clip_textuals))  # [(BN) 60 80 512]
+        # Fusion: clip | vis => 2 | 1 [n_channels]
+        x = self.conv_fusion_1((x, vis_2))          # [(BN) 60 80 512]
+        x = self.up_2((x, clip_l2))                 # [(BN) 120 160 256]
+        x = self.multiply_fusion_3((x, clip_textuals))  # [(BN) 120 160 256]
+        # Fusion: clip | vis => 1 | 1 [n_channels]
+        x = self.conv_fusion_2((x, vis_1))          # [(BN) 120 160 256]
+        x = self.up_3((x, clip_l1))                 # [(BN) 240 320 256]
+        # Fusion: clip | vis => 1 | 1 [n_channels]
+        # TODO: Think about clip | vis => 1 | 2, meaning up_3 = Up(128)
+        x = self.conv_fusion_3((x, visual_features))  # [(BN) 240 320 256]
+        x = self.up_sample(x)                       # [(BN) 480 640 256]
+        return x
