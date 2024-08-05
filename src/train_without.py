@@ -118,6 +118,7 @@ def main(cfg: DictConfig) -> None:
 
     nerf_renderer(train_data_generator[0][0])
     compile_model(nerf_renderer)
+    nerf_renderer.summary()
 
     os.makedirs(f'{cfg.nerf_training.model_path}/valid', exist_ok=True)
     model_checkpoint_name = f'{cfg.nerf_training.model_path}/model_final'

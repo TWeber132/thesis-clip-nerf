@@ -52,6 +52,7 @@ def main(cfg: DictConfig) -> None:
                                cfg.generator_grasp.n_future_poses,
                                softmax_before_loss=softmax_before_loss)
     _ = grasp_model(data_generator[0][0])
+    grasp_model.summary()
 
     if cfg.grasp_training.loss == 'cross_entropy':
         loss = tf.keras.losses.CategoricalCrossentropy(from_logits=True)
