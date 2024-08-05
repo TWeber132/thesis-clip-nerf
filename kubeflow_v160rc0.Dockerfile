@@ -1,12 +1,12 @@
 ##############################################################################
 ##                                 Base Image                               ##
 ##############################################################################
-FROM kubeflownotebookswg/jupyter:v1.6.0-rc.0 as kubeflow-base
+FROM kubeflownotebookswg/jupyter:v1.6.0-rc.0 AS kubeflow-base
 
 ##############################################################################
 ##                          jupyter-tensorflow-cuda                         ##
 ##############################################################################
-FROM kubeflow-base as jupyter-tensorflow-cuda
+FROM kubeflow-base AS jupyter-tensorflow-cuda
 # SEE https://github.com/kubeflow/kubeflow/blob/v1.6.0-rc.0/components/example-notebook-servers/jupyter-tensorflow/cuda.Dockerfile
 
 USER root
@@ -92,7 +92,7 @@ RUN python3 -m pip install --quiet --no-cache-dir tensorflow-gpu==${TENSORFLOW_V
 ##############################################################################
 ##                          jupyter-tensorflow-cuda                         ##
 ##############################################################################
-FROM jupyter-tensorflow-cuda as jupyter-tensorflow-cuda-full
+FROM jupyter-tensorflow-cuda AS jupyter-tensorflow-cuda-full
 
 RUN pip install --no-cache-dir \
                 kfp==1.6.3 \
@@ -118,13 +118,14 @@ RUN pip install --no-cache-dir \
 ##############################################################################
 ##                                 Dependencies                             ##
 ##############################################################################
-FROM jupyter-tensorflow-cuda-full as tf-dependencies
+FROM jupyter-tensorflow-cuda-full AS tf-dependencies
 
 USER root
 RUN DEBIAN_FRONTEND=noninteractive \
 	apt-get update && \
 	apt install -y mesa-utils libgl1-mesa-glx libglu1-mesa-dev freeglut3-dev mesa-common-dev libopencv-dev python3-opencv python3-tk
-RUN apt-get update && apt-get install -y screen git 
+RUN apt-get update && apt-get install -y screen git
+
 USER $NB_USER
 RUN pip install --no-cache-dir opencv-contrib-python
 RUN pip install --no-cache-dir transforms3d tensorflow_addons
@@ -144,8 +145,19 @@ RUN pip install --no-cache-dir ftfy regex
 ##############################################################################
 ##                                 Manipulation Tasks                       ##
 ##############################################################################
-FROM tf-dependencies as tf-manipulation-tasks
+FROM tf-dependencies AS tf-manipulation-tasks
 
 COPY --chown=$NB_UID:$NB_UID ./dependencies /opt/dependencies
 RUN cd /opt/dependencies/manipulation_tasks && \
     pip install .
+
+# ##############################################################################
+# ##                                 Simulation                               ##
+# ##############################################################################
+# FROM tf-manipulation-tasks AS tf-gym
+
+# RUN pip install --no-cache-dir gym==0.17.3
+# RUN pip install --no-cache-dir "pybullet>=3.0.4"
+# RUN pip install --no-cache-dir tdqm
+# RUN pip install --no-cache-dir transformers==4.3.2
+# RUN pip install --no-cache-dir imageio-ffmpeg

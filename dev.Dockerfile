@@ -88,7 +88,7 @@ RUN pip install hydra-core --upgrade
 FROM tf-manipulation-tasks AS tf-gym
 
 RUN pip install --no-cache-dir gym==0.17.3
-RUN pip install --no-cache-dir pybullet>=3.0.4
+RUN pip install --no-cache-dir "pybullet>=3.0.4"
 RUN pip install --no-cache-dir tdqm
 RUN pip install --no-cache-dir transformers==4.3.2
 RUN pip install --no-cache-dir imageio-ffmpeg
