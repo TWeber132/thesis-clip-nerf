@@ -1,8 +1,0 @@
-defaults:
-  - grasp_model: grasp
-  - generator_grasp: grasp
-  - nerf_model: 3_views
-  - optimizer_config: 3_images
-optimizer_name: grasp_3_views
-model_path: /home/hephaestus/workspace/data/models/grasp/simple/grasp_3_views
-backbone_path: /home/hephaestus/workspace/data/models/nerf/simple/3_views

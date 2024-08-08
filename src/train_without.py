@@ -81,7 +81,7 @@ def validate(nerf_renderer, tgt_color, valid_data):
     return combined_image
 
 
-@hydra.main(version_base=None, config_path="configuration", config_name="nerf_1_view_wo")
+@hydra.main(version_base=None, config_path="configs", config_name="nerf_1_view_wo")
 def main(cfg: DictConfig) -> None:
     physical_devices = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(physical_devices[0], True)

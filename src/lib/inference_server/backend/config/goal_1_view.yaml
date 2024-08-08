@@ -1,8 +1,0 @@
-defaults:
-  - grasp_model: goal
-  - generator_grasp: goal
-  - nerf_model: 1_view
-  - optimizer_config: 2_images-1
-optimizer_name: goal_1_view
-model_path: /home/jovyan/data/models/grasp/simple/goal_1_view
-backbone_path: /home/jovyan/data/models/nerf/simple/1_view

@@ -16,7 +16,7 @@ from util import load_dataset_baseline, setup_oracle, get_inputs, load_dataset
 import wandb
 
 
-@hydra.main(version_base=None, config_path="configuration", config_name="trajectory_1_view-2")
+@hydra.main(version_base=None, config_path="configs", config_name="trajectory_1_view-2")
 def main(cfg: DictConfig) -> None:
     # allow memory growth to avoid OOM errors
     gpus = tf.config.list_physical_devices('GPU')

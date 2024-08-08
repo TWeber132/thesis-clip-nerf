@@ -16,7 +16,7 @@ from lib.dataset.utils import load_dataset_language, load_dataset_goal
 import wandb
 
 
-@hydra.main(version_base=None, config_path="configuration", config_name="language_1_view")
+@hydra.main(version_base=None, config_path="configs", config_name="language_1_view")
 def main(cfg: DictConfig) -> None:
     tf.config.run_functions_eagerly(True)
     # allow memory growth to avoid OOM errors

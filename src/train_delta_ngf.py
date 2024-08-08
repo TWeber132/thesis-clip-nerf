@@ -17,7 +17,7 @@ from util import load_dataset, load_dataset_baseline, setup_oracle, get_inputs
 import wandb
 
 
-@hydra.main(version_base=None, config_path="config", config_name="dngf_training_ebm_6d")
+@hydra.main(version_base=None, config_path="alt_configs", config_name="dngf_training_ebm_6d")
 def main(cfg: DictConfig) -> None:
     # allow memory growth to avoid OOM errors
     # gpus = tf.config.list_physical_devices('GPU')
@@ -35,7 +35,8 @@ def main(cfg: DictConfig) -> None:
     valid_dataset_cfg = dict(cfg.dataset)
     valid_dataset_cfg.pop('record_grasp_pose')
     valid_dataset_cfg.pop('record_order')
-    valid_dataset = load_dataset_baseline(**valid_dataset_cfg, dataset_type='valid')
+    valid_dataset = load_dataset_baseline(
+        **valid_dataset_cfg, dataset_type='valid')
 
     data_generator = DeltaNGFDataGenerator(train_dataset,
                                            **cfg.generator_grasp,
@@ -50,9 +51,11 @@ def main(cfg: DictConfig) -> None:
     grasp_model = DeltaNGF(**cfg.grasp_model,
                            n_features=cfg.nerf_model.n_features,
                            n_views=cfg.nerf_model.n_views,
-                           original_image_size=list(cfg.nerf_model.original_image_size),
+                           original_image_size=list(
+                               cfg.nerf_model.original_image_size),
                            batch_size=cfg.grasp_training.batch_size,
-                           n_points_train=cfg.generator_grasp.pose_augmentation_factor * cfg.generator_grasp.n_future_poses,
+                           n_points_train=cfg.generator_grasp.pose_augmentation_factor *
+                           cfg.generator_grasp.n_future_poses,
                            softmax_before_loss=softmax_before_loss)
     _ = grasp_model(data_generator[0][0])
 
@@ -63,21 +66,25 @@ def main(cfg: DictConfig) -> None:
     else:
         raise ValueError(f"Loss {cfg.grasp_training.loss} not supported.")
 
-    opt_landscape = tf.keras.optimizers.Adam(learning_rate=cfg.grasp_training.learning_rate)
+    opt_landscape = tf.keras.optimizers.Adam(
+        learning_rate=cfg.grasp_training.learning_rate)
     grasp_model.compile(optimizer=opt_landscape, loss=loss)
 
-    backbone_checkpoint_name = os.path.join(cfg.grasp_training.backbone_path, 'model_final')
+    backbone_checkpoint_name = os.path.join(
+        cfg.grasp_training.backbone_path, 'model_final')
     if grasp_model.load_backbone(backbone_checkpoint_name):
         logger.info(f"Backbone loaded from {backbone_checkpoint_name}.")
     else:
-        raise FileNotFoundError(f"Model not found at {backbone_checkpoint_name}.")
+        raise FileNotFoundError(
+            f"Model not found at {backbone_checkpoint_name}.")
 
     os.makedirs(f'{cfg.grasp_training.model_path}/valid', exist_ok=True)
     model_checkpoint_name = f'{cfg.grasp_training.model_path}/model_final'
     if grasp_model.load(model_checkpoint_name):
         logger.info(f"Model loaded from {model_checkpoint_name}.")
     else:
-        load_pretrained_weights(cfg.torch_weights_path, grasp_model.visual_features.vision_transformer)
+        load_pretrained_weights(cfg.torch_weights_path,
+                                grasp_model.visual_features.vision_transformer)
         logger.info("New model initialized. Loaded pretrained weights.")
 
     grasp_optimizer = DNGFOptimizer(grasp_model,
@@ -99,8 +106,10 @@ def main(cfg: DictConfig) -> None:
         'settings': wandb.Settings(start_method="fork")
     }
 
-    validation_oracle = setup_oracle(cfg.validation.plugins, cfg.validation.oracle)
-    optimization_config = dict(cfg.validation.grasp_opt_config.optimization_config)
+    validation_oracle = setup_oracle(
+        cfg.validation.plugins, cfg.validation.oracle)
+    optimization_config = dict(
+        cfg.validation.grasp_opt_config.optimization_config)
     optimization_config["sync"] = True
     train_grasp_model(grasp_model, data_generator, cfg.grasp_training.n_epochs,
                       cfg.grasp_training.eval_after_epochs, cfg.grasp_training.model_path, model_checkpoint_name,

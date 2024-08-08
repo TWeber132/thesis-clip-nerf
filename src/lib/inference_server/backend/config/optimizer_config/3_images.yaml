@@ -1,9 +1,0 @@
-optimizer_config:
-  n_initial_guesses: 4096
-  n_images: 3
-optimization_config:
-  n_optimization_steps: 16
-  init_lr_t: 0.05
-  init_lr_r: 0.05
-  decay_t: 0.9
-  decay_r: 0.09

@@ -1,8 +1,0 @@
-defaults:
-  - grasp_model: trajectory-1
-  - generator_grasp: trajectory
-  - nerf_model: 1_view
-  - optimizer_config: 2_images-1
-optimizer_name: trajectory_1_view-1
-model_path: /home/jovyan/data/models/grasp/simple/trajectory_1_view
-backbone_path: /home/jovyan/data/models/nerf/simple/1_view

@@ -1,8 +1,0 @@
-defaults:
-  - grasp_model: dngf_quat
-  - generator_grasp: dngf
-  - nerf_model: 1_view
-  - optimizer_config: 2_images_quat
-optimizer_name: grasp_1_view
-model_path: /home/hephaestus/workspace/data/models/grasp/simple/dngf_1_view_ebm_quat
-backbone_path: /home/hephaestus/workspace/data/models/nerf/simple/1_view

@@ -11,7 +11,7 @@ from tensorflow_addons.optimizers import MultiOptimizer
 import hydra
 
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
-from lib.mvnerf.model_v4 import MVVNeRFRenderer, render_view
+from lib.mvnerf.model_v0 import MVVNeRFRenderer, render_view
 from lib.mvnerf.nerf_utils import WarmupScheduler, load_pretrained_weights
 from lib.dataset.utils import load_dataset_nerf
 from util import init_training_session
@@ -81,7 +81,7 @@ def validate(nerf_renderer, tgt_color, valid_data):
     return combined_image
 
 
-@hydra.main(version_base=None, config_path="configuration", config_name="nerf_1_view")
+@hydra.main(version_base=None, config_path="configs", config_name="nerf_1_view")
 def main(cfg: DictConfig) -> None:
     physical_devices = tf.config.list_physical_devices('GPU')
     tf.config.experimental.set_memory_growth(physical_devices[0], True)
