@@ -1,4 +1,4 @@
 defaults:
   - default
 batch_size: 8
-model_path: "/home/jovyan/data/storage/models/nerf/v3_w_elu/1_view"
+model_path: "/home/jovyan/data/storage/models/nerf/v4_w_elu/1_view"

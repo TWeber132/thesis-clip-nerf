@@ -11,7 +11,7 @@ from tensorflow_addons.optimizers import MultiOptimizer
 import hydra
 
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
-from lib.mvnerf.model_v3 import MVVNeRFRenderer, render_view
+from lib.mvnerf.model_v4 import MVVNeRFRenderer, render_view
 from lib.mvnerf.nerf_utils import WarmupScheduler, load_pretrained_weights
 from lib.dataset.utils import load_dataset_nerf
 from util import init_training_session
@@ -119,6 +119,7 @@ def main(cfg: DictConfig) -> None:
     nerf_renderer(train_data_generator[0][0])
     compile_model(nerf_renderer)
     nerf_renderer.summary()
+    nerf_renderer.combine_clip_visual.summary()
 
     os.makedirs(f'{cfg.nerf_training.model_path}/valid', exist_ok=True)
     model_checkpoint_name = f'{cfg.nerf_training.model_path}/model_final'
