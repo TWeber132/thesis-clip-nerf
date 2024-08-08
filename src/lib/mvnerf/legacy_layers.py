@@ -50,7 +50,7 @@ class CLIPFeatureExtraction(tf.keras.layers.Layer):
         return self.flatten(self.max_pool(inputs))
 
 
-class CombineCLIPVisualV2(tf.keras.layers.Layer):
+class CombineCLIPVisualV2(tf.keras.Model):
     def __init__(self, name="combine_clip_visual"):
         super().__init__(name=name)
 
@@ -101,7 +101,7 @@ class CombineCLIPVisualV2(tf.keras.layers.Layer):
         return x
 
 
-class CombineCLIPVisualV1(tf.keras.layers.Layer):
+class CombineCLIPVisualV1(tf.keras.Model):
     def __init__(self, name="combine_clip_visual"):
         super().__init__(name=name)
 
@@ -148,7 +148,7 @@ class CombineCLIPVisualV1(tf.keras.layers.Layer):
         return x
 
 
-class CombineCLIPVisualV0(tf.keras.layers.Layer):
+class CombineCLIPVisualV0(tf.keras.Model):
     def __init__(self, name="combine_clip_visual_legacy"):
         super().__init__(name=name)
 

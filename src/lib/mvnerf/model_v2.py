@@ -4,7 +4,8 @@ import numpy as np
 import tensorflow as tf
 from einops import rearrange, repeat
 
-from lib.mvnerf.layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures, CombineCLIPVisualV2
+from lib.mvnerf.legacy_layers import CombineCLIPVisualV2
+from lib.mvnerf.layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures
 from lib.mvnerf.nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_projection_features_mv, \
     world_to_camera_direction_vector_mv, sigma_to_alpha, sample_pdf, optimize, get_rays
 from lib.data_generator.mvnerf import MVNeRFDataGenerator
@@ -28,7 +29,7 @@ class MVVNeRFRenderer(tf.keras.Model):
 
         self.visual_features = VisualFeatures(n_features, original_image_size)
         self.clip_visual = CLIPVisualEncoder()
-        self.combine_clip_visual_features = CombineCLIPVisualV2()
+        self.combine_clip_visual = CombineCLIPVisualV2()
         self.up = tf.keras.layers.UpSampling2D(
             size=2, interpolation='bilinear')
 
@@ -209,6 +210,8 @@ class MVVNeRFRenderer(tf.keras.Model):
         self.fine_readout.save_weights(fine_readout_path)
         visual_features_path = f'{path}_visual_features'
         self.visual_features.save_weights(visual_features_path)
+        combine_clip_visual_path = f'{path}_combine_clip_visual'
+        self.combine_clip_visual.save_weights(combine_clip_visual_path)
 
     def load(self, path, old=False):
         coarse_embedding_path = f'{path}_coarse_embedding'
@@ -216,6 +219,7 @@ class MVVNeRFRenderer(tf.keras.Model):
         fine_embedding_path = f'{path}_fine_embedding'
         fine_readout_path = f'{path}_fine_readout'
         visual_features_path = f'{path}_visual_features'
+        combine_clip_visual_path = f'{path}_combine_clip_visual'
         # check if <path>.index exists for all paths above
         if not os.path.exists(coarse_embedding_path + '.index'):
             return False
@@ -227,12 +231,15 @@ class MVVNeRFRenderer(tf.keras.Model):
             return False
         if not os.path.exists(visual_features_path + '.index'):
             return False
+        if not os.path.exists(combine_clip_visual_path + '.index'):
+            return False
 
         self.coarse_embedding.load_weights(coarse_embedding_path)
         self.coarse_readout.load_weights(coarse_readout_path)
         self.fine_embedding.load_weights(fine_embedding_path)
         self.fine_readout.load_weights(fine_readout_path)
         self.visual_features.load_weights(visual_features_path)
+        self.combine_clip_visual.load_weights(combine_clip_visual_path)
         return True
 
 
@@ -254,7 +261,7 @@ def render_view(model, src_colors, src_camera_configs, tgt_camera_config):
     visual_features = model.encode(src_images)
     clip_images = preprocess_tf(src_images)
     clip_outputs = model.clip_visual(clip_images)
-    combined_features = model.combine_clip_visual_features((
+    combined_features = model.combine_clip_visual((
         clip_outputs, visual_features))
     combined_features = rearrange(
         combined_features, '(b n) h w c -> b n h w c', b=1)
