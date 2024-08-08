@@ -435,7 +435,7 @@ class DoubleConv(tf.keras.layers.Layer):
 
 
 class Up(tf.keras.layers.Layer):
-    def __init__(self, shape, filters, activation='relu', name="level"):
+    def __init__(self, shape, filters, activation='relu', name="up"):
         super().__init__(name=name)
 
         self.resize = tf.keras.layers.Resizing(
