@@ -2,8 +2,8 @@ import cv2
 import numpy as np
 from manipulation_tasks.transform import Affine
 
-from lib.data_generator.base import DataGenerator
-from lib.data_generator.util import camera_parameters
+from ..data_generator.base import DataGenerator
+from ..data_generator.util import camera_parameters
 
 
 class DeltaNGFDataGenerator(DataGenerator):

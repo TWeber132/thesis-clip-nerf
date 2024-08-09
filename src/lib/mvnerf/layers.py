@@ -1,6 +1,6 @@
 import tensorflow as tf
 import numpy as np
-from lib.mvnerf.nerf_utils import position_encoding
+from ..mvnerf.nerf_utils import position_encoding
 from einops import rearrange
 
 

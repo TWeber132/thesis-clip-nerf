@@ -4,7 +4,7 @@ from einops import rearrange
 from manipulation_tasks.transform import Affine
 import tensorflow_graphics.geometry.transformation as tf_transformation
 
-from lib.mvnerf.nerf_utils import optimize
+from ..mvnerf.nerf_utils import optimize
 
 
 def t_m_to_h_matrix(translations, rot_matrices):

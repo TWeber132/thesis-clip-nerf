@@ -6,10 +6,10 @@ from einops import rearrange
 from manipulation_tasks.transform import Affine
 from tensorflow_addons.image import interpolate_bilinear
 
-from lib.mvnerf.nerf_utils import optimize
+from ..mvnerf.nerf_utils import optimize
 
-from lib.grasp_mvnerf.layers import GraspReadout
-from lib.mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding
+from ..grasp_mvnerf.layers import GraspReadout
+from ..mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding
 
 
 class GraspMVNeRF(tf.keras.Model):

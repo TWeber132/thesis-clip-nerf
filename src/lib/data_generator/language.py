@@ -3,9 +3,9 @@ import numpy as np
 import tensorflow as tf
 from manipulation_tasks.transform import Affine
 
-from lib.data_generator.base import DataGenerator
-from lib.data_generator.util import camera_parameters
-from lib.clip.utils import tokenize
+from ..data_generator.base import DataGenerator
+from ..data_generator.util import camera_parameters
+from ..clip.utils import tokenize
 
 
 class LanguageDataGenerator(DataGenerator):

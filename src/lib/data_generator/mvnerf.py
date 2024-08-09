@@ -3,7 +3,7 @@ import numpy as np
 from .base import DataGenerator
 from .util import camera_parameters
 
-from lib.mvnerf.nerf_utils import get_specific_rays, bbox_biased_sample
+from ..mvnerf.nerf_utils import get_specific_rays, bbox_biased_sample
 
 
 class MVNeRFDataGenerator(DataGenerator):

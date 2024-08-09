@@ -7,11 +7,10 @@ from manipulation_tasks.transform import Affine
 from tensorflow_addons.image import interpolate_bilinear
 import tensorflow_graphics.geometry.transformation as tf_transformation
 
-from lib.mvnerf.nerf_utils import optimize
+from ..mvnerf.nerf_utils import optimize
 
-from lib.delta_ngf.layers import GraspReadout
-from lib.mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding
-
+from ..delta_ngf.layers import GraspReadout
+from ..mvnerf.layers import VisualFeatures, MVResNetMLPNeRFEmbedding
 
 
 def t_m_to_h_matrix(translations, rot_matrices):

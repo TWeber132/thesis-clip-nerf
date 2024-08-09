@@ -2,7 +2,7 @@ import os
 
 import tensorflow as tf
 from einops import rearrange
-from lib.mvnerf.layers import ResNetMLPBlock, Readout
+from ..mvnerf.layers import ResNetMLPBlock, Readout
 
 
 class GraspReadout(tf.keras.Model):

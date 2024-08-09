@@ -4,12 +4,12 @@ import numpy as np
 import tensorflow as tf
 from einops import rearrange, repeat
 
-from lib.mvnerf.layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures, CombineCLIPVisualV3
-from lib.mvnerf.nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_projection_features_mv, \
+from ..mvnerf.layers import MVResNetMLPNeRFEmbedding, RenderReadout, VisualFeatures, CombineCLIPVisualV3
+from ..mvnerf.nerf_utils import sample_along_ray, compute_pixel_in_image_mv, get_projection_features_mv, \
     world_to_camera_direction_vector_mv, sigma_to_alpha, sample_pdf, optimize, get_rays
-from lib.data_generator.mvnerf import MVNeRFDataGenerator
-from lib.clip.model import CLIPVisualEncoder
-from lib.clip.utils import preprocess_tf
+from ..data_generator.mvnerf import MVNeRFDataGenerator
+from ..clip.model import CLIPVisualEncoder
+from ..clip.utils import preprocess_tf
 
 
 class MVVNeRFRenderer(tf.keras.Model):
