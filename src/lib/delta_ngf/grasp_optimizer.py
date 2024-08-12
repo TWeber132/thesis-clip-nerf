@@ -106,7 +106,7 @@ class DNGFOptimizer(tf.keras.Model):
         matrices = tf.tile(matrices, [self.batch_size, 1, 1, 1])
         grasp_success = self.nerf_grasper.infer(
             (None, None, None, None, inputs[0][0], inputs[0][1],
-             inputs[0][2]), matrices, self.n_initial_guesses,
+             inputs[0][2], inputs[0][3]), matrices, self.n_initial_guesses,
             inputs[1])
         return grasp_success
 

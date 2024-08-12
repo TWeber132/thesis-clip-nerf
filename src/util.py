@@ -75,9 +75,9 @@ def get_inputs(dataset, sample_idx, n_images, grasp_model):
     observations = []
     intrinsics = []
     extrinsics_inv = []
-
+    # 1 batch_size
     text = dataset.datasets['language'].read_sample(sample_idx)
-    tokens = [tokenize(text)]  # 1 batch_size
+    tokens = tokenize(text)
     tokens = np.array(tokens, dtype=np.int32)
 
     if n_images == 2:
