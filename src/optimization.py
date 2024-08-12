@@ -11,7 +11,7 @@ def validate(pose_optimizer, optimization_config, valid_data):
     durations = []
     best_errors_r = []
     all_errors_r = []
-    for i, (input_data, features, _task_info) in enumerate(valid_data):
+    for i, (input_data, features, _task_info, grasp_pose_h) in enumerate(valid_data):
         logger.info(
             f"Validating on sample {i + 1} with {1.232} objects ...")
         losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, _ = compute_results(
@@ -20,10 +20,10 @@ def validate(pose_optimizer, optimization_config, valid_data):
             **optimization_config)
 
         result = get_step_results(
-            losses_t, losses_r, optimized_grasps_t, optimized_grasps_r)
+            losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, grasp_pose_h)
         results.append(result)
         durations.append(duration)
-        errors_r = result['r_errors']
+        errors_r = result['errors_r']
         all_errors_r.append(errors_r)
 
         best_error_r_idx = -1
@@ -103,8 +103,9 @@ def compute_results(pose_optimizer, input_data, features, return_trajectory, ini
     return losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, all_poses
 
 
-def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r):
+def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, gt_grasp_pose_h):
     oracle = OracleAgent()
+    gt_grasp_pose = gt_grasp_pose_h
     # determine the best 5 grasp indices based on their final success
     # best_grasp_indices_t = np.argsort(losses_t)[-5:]
     best_grasp_indices_r = np.argsort(losses_r)[-5:]
@@ -112,17 +113,20 @@ def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r):
     # get the best 5 grasp poses
     best_grasp_poses_r = [trajectory_r[k] for k in best_grasp_indices_r]
     final_success_r = [losses_r[k] for k in best_grasp_indices_r]
-    r_errors = []
+    errors_r = []
     for k in range(len(best_grasp_poses_r)):
         print(best_grasp_poses_r[k])
 
-        t_error, r_error = oracle.calculate_errors(gt_action, action)
-        r_errors.append([t_error, r_error])
+        trans_error, rot_error = oracle.calculate_errors(
+            gt_grasp_pose, best_grasp_poses_r[k])
+        # t_error, r_error = oracle.calculate_errors(gt_action, action)
+        print(trans_error, rot_error)
+        errors_r.append([trans_error, rot_error])
 
     results = {
         'grasp_poses': best_grasp_poses_r,
         'final_success': final_success_r,
-        'r_errors': r_errors
+        'errors_r': errors_r
     }
     return results
 
