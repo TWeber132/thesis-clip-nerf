@@ -106,28 +106,23 @@ def compute_results(pose_optimizer, input_data, features, return_trajectory, ini
 def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r):
     oracle = OracleAgent()
     # determine the best 5 grasp indices based on their final success
-    best_grasp_indices_t = np.argsort(losses_t)[-5:]
+    # best_grasp_indices_t = np.argsort(losses_t)[-5:]
     best_grasp_indices_r = np.argsort(losses_r)[-5:]
 
     # get the best 5 grasp poses
-    best_grasp_poses_t = [trajectory_t[k] for k in best_grasp_indices_t]
     best_grasp_poses_r = [trajectory_r[k] for k in best_grasp_indices_r]
     final_success_r = [losses_r[k] for k in best_grasp_indices_r]
-    t_errors = []
     r_errors = []
     for k in range(len(best_grasp_poses_r)):
         print(best_grasp_poses_r[k])
-        print(best_grasp_poses_t[k])
-        exit()
+
         t_error, r_error = oracle.calculate_errors(gt_action, action)
-        t_errors.append(t_error)
-        r_errors.append(r_error)
+        r_errors.append([t_error, r_error])
 
     results = {
         'grasp_poses': best_grasp_poses_r,
         'final_success': final_success_r,
-        'r_errors': r_errors,
-        't_errors': t_errors
+        'r_errors': r_errors
     }
     return results
 
