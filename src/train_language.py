@@ -29,7 +29,7 @@ def main(cfg: DictConfig) -> None:
 
     train_dataset = load_dataset_language(
         cfg.dataset.n_perspectives, cfg.dataset.path + '/train')
-    valid_dataset = load_dataset_goal(
+    valid_dataset = load_dataset_language(
         cfg.dataset.n_perspectives, cfg.dataset.path + '/valid')  # load_dataset_baseline
 
     data_generator = LanguageDataGenerator(train_dataset,
