@@ -1,6 +1,8 @@
 import json
 import os
 import time
+import tensorflow as tf
+
 
 import numpy as np
 import wandb
@@ -10,7 +12,8 @@ from manipulation_tasks import loader, factory
 
 from lib.data_generator.util import camera_parameters
 from lib.dataset.dataset import ColorDataset, MNPZDataset, NPZDataset, PickleDataset, SynchronizedDatasets
-import tensorflow as tf
+from lib.clip.utils import preprocess_tf
+from lib.clip.utils import tokenize
 
 
 def load_training_progress(eval_after_epochs, model_log_dir, n_epochs):
@@ -72,6 +75,11 @@ def get_inputs(dataset, sample_idx, n_images, grasp_model):
     observations = []
     intrinsics = []
     extrinsics_inv = []
+
+    text = dataset.datasets['language'].read_sample(sample_idx)
+    tokens = [tokenize(text)]  # 1 batch_size
+    tokens = np.array(tokens, dtype=np.int32)
+
     if n_images == 2:
         for i in range(3, 5):
             src_img = dataset.datasets['color'].read_sample_at_idx(
@@ -97,15 +105,23 @@ def get_inputs(dataset, sample_idx, n_images, grasp_model):
     extrinsics_inv = np.array([extrinsics_inv])
     input_data = [observations.astype(np.float32),
                   intrinsics.astype(np.float32),
-                  extrinsics_inv.astype(np.float32)]
-    features = compute_features(input_data[0], grasp_model.visual_features)
+                  extrinsics_inv.astype(np.float32),
+                  tokens]
+    features = compute_features(input_data[0], tokens, grasp_model)
     task_info = dataset.datasets['info'].read_sample(sample_idx)
     return input_data, features, task_info
 
 
-def compute_features(images, feature_extractor):
+def compute_features(images, clip_tokens, grasp_model):
     src_images = rearrange(images, 'b n h w c -> (b n) h w c')
-    batched_features = feature_extractor(src_images)
-    batched_features = rearrange(
-        batched_features, '(b n) h w c -> b n h w c', b=images.shape[0])
-    return batched_features
+
+    clip_images = preprocess_tf(src_images)
+    clip_visuals = grasp_model.clip_visual(clip_images)
+    visual_features = grasp_model.visual_features(src_images)
+    clip_textuals = grasp_model.clip_textual(clip_tokens)      # [(BN) 1024]
+    combined_features = grasp_model.combine_clip_visual(
+        (clip_visuals, visual_features, clip_textuals))
+
+    combined_features = rearrange(
+        combined_features, '(b n) h w c -> b n h w c', b=images.shape[0])
+    return combined_features
