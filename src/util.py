@@ -109,7 +109,7 @@ def get_inputs(dataset, sample_idx, n_images, grasp_model):
                   tokens]
     features = compute_features(input_data[0], tokens, grasp_model)
     task_info = dataset.datasets['info'].read_sample(sample_idx)
-    grasp_pose = dataset.datasets['grasp_pose'].read_sample(sample_idx)
+    grasp_pose = dataset.datasets['grasp_pose'].read_sample(sample_idx)['grasp_pose']
     return input_data, features, task_info, grasp_pose
 
 
