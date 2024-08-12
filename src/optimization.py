@@ -3,32 +3,34 @@ import time
 import numpy as np
 import tensorflow as tf
 from loguru import logger
-from manipulation_tasks import factory
+from .lib.simulation.tasks.picking_google_objects import PickSeenGoogleObjects
 
 
-def validate(pose_optimizer, optimization_config, valid_data, validation_oracle):
+def validate(pose_optimizer, optimization_config, valid_data):
     results = []
     durations = []
     best_errors_r = []
     all_errors_r = []
     for i, (input_data, features, task_info) in enumerate(valid_data):
-        task = factory.create_task(task_info)
-        logger.info(f"Validating on sample {i + 1} with {len(task.manipulation_objects)} objects ...")
+        task = PickSeenGoogleObjects(task_info)
+        logger.info(
+            f"Validating on sample {i + 1} with {len(task.manipulation_objects)} objects ...")
         losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, _ = compute_results(
             pose_optimizer,
             input_data, features, False,
             **optimization_config)
 
-        result = get_step_results(losses_t, losses_r, optimized_grasps_t, optimized_grasps_r,
-                                  validation_oracle, task)
+        result = get_step_results(
+            losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, task)
         results.append(result)
         durations.append(duration)
-        errors_r = result['errors']
+        errors_r = result['r_errors']
         all_errors_r.append(errors_r)
 
         best_error_r_idx = -1
         best_error_r = errors_r[best_error_r_idx]
-        logger.info(f"   Best    {best_error_r[0] * 1000}    {best_error_r[1] / np.pi * 180}")
+        logger.info(
+            f"   Best    {best_error_r[0] * 1000}    {best_error_r[1] / np.pi * 180}")
 
         best_errors_r.append(best_error_r)
     return results
@@ -102,22 +104,31 @@ def compute_results(pose_optimizer, input_data, features, return_trajectory, ini
     return losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, all_poses
 
 
-def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, validation_oracle, task):
+def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, task):
+    oracle = task.create_oracle_agent()
     # determine the best 5 grasp indices based on their final success
-    # best_grasp_indices_t = np.argsort(losses_t)[-5:]
+    best_grasp_indices_t = np.argsort(losses_t)[-5:]
     best_grasp_indices_r = np.argsort(losses_r)[-5:]
 
     # get the best 5 grasp poses
+    best_grasp_poses_t = [trajectory_t[k] for k in best_grasp_indices_t]
     best_grasp_poses_r = [trajectory_r[k] for k in best_grasp_indices_r]
     final_success_r = [losses_r[k] for k in best_grasp_indices_r]
-    errors_r = []
+    t_errors = []
+    r_errors = []
     for k in range(len(best_grasp_poses_r)):
-        errors_r.append(validation_oracle.compute_attention_errors(task, best_grasp_poses_r[k])[0])
+        print(best_grasp_poses_r[k])
+        print(best_grasp_poses_t[k])
+        exit()
+        t_error, r_error = oracle.calculate_errors(gt_action, action)
+        t_errors.append(t_error)
+        r_errors.append(r_error)
 
     results = {
         'grasp_poses': best_grasp_poses_r,
         'final_success': final_success_r,
-        'errors': errors_r
+        'r_errors': r_errors,
+        't_errors': t_errors
     }
     return results
 
@@ -127,14 +138,16 @@ def optimize_pose(pose_optimizer, input_data, batched_features, train_config, n_
     start = time.time()
     step_poses = []
     for j in range(n_optimization_steps):
-        ret = pose_optimizer.optimize_pose(input_data, batched_features, train_config=train_config)
+        ret = pose_optimizer.optimize_pose(
+            input_data, batched_features, train_config=train_config)
         poses = []
         if return_trajectory:
             poses = pose_optimizer.get_results()
         step_poses.append(poses)
     optimized_grasps = pose_optimizer.get_results()
     step_poses.append(optimized_grasps)
-    losses = pose_optimizer.compute_current_grasp_success(input_data, batched_features).numpy().squeeze()
+    losses = pose_optimizer.compute_current_grasp_success(
+        input_data, batched_features).numpy().squeeze()
     end = time.time()
     duration = end - start
     return optimized_grasps, losses, duration, step_poses

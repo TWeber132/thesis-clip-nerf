@@ -68,7 +68,7 @@ def log_results(epoch, results, wandb_initialized):
         wandb.log(log_dict)
 
 
-def get_inputs(dataset, sample_idx, n_images):  # , grasp_model):
+def get_inputs(dataset, sample_idx, n_images, grasp_model):
     observations = []
     intrinsics = []
     extrinsics_inv = []
@@ -98,19 +98,9 @@ def get_inputs(dataset, sample_idx, n_images):  # , grasp_model):
     input_data = [observations.astype(np.float32),
                   intrinsics.astype(np.float32),
                   extrinsics_inv.astype(np.float32)]
-    # features = compute_features(input_data[0], grasp_model.visual_features)
-    # task_info = dataset.datasets['info'].read_sample(sample_idx)
-    return input_data  # , features  # , task_info
-
-
-def get_info(dataset, sample_idx):
+    features = compute_features(input_data[0], grasp_model.visual_features)
     task_info = dataset.datasets['info'].read_sample(sample_idx)
-    return task_info
-
-
-def get_outputs(dataset, sample_idx):
-    grasp_pose = dataset.datasets['grasp_pose'].read_sample(sample_idx)
-    return grasp_pose
+    return input_data, features, task_info
 
 
 def compute_features(images, feature_extractor):

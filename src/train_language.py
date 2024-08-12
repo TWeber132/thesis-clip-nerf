@@ -12,6 +12,7 @@ from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
 from training import train_grasp_model
 from lib.dataset.utils import load_dataset_language, load_dataset_goal
+from util import get_inputs
 
 import wandb
 
@@ -87,6 +88,8 @@ def main(cfg: DictConfig) -> None:
                                     **cfg.validation.grasp_opt_config.optimizer_config,
                                     workspace_bounds=cfg.generator_grasp.workspace_bounds,
                                     rotation_representation=cfg.grasp_model.rotation_representation)
+    valid_data = [get_inputs(valid_dataset, i, int(cfg.validation.grasp_opt_config.optimizer_config.n_images), grasp_model) for i
+                  in cfg.valid_sample_indices]
 
     wandb_project_name = cfg.grasp_training.model_path.split('/')[-1]
     wandb_dir = f"{cfg.grasp_training.model_path}/wandb"
@@ -98,14 +101,12 @@ def main(cfg: DictConfig) -> None:
         'settings': wandb.Settings(start_method="fork")
     }
 
-    # validation_oracle = setup_oracle(
-    #     cfg.validation.plugins, cfg.validation.oracle)
     optimization_config = dict(
         cfg.validation.grasp_opt_config.optimization_config)
     optimization_config["sync"] = False
     train_grasp_model(grasp_model, data_generator, cfg.grasp_training.n_epochs,
                       cfg.grasp_training.eval_after_epochs, cfg.grasp_training.model_path, model_checkpoint_name,
-                      grasp_optimizer, cfg.validation.grasp_opt_config.optimization_config, wandb_config)
+                      grasp_optimizer, cfg.validation.grasp_opt_config.optimization_config, wandb_config, valid_data)
 
 
 if __name__ == '__main__':

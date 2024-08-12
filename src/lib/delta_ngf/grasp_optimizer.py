@@ -14,12 +14,14 @@ def t_m_to_h_matrix(translations, rot_matrices):
     last_row = tf.reshape(last_row, [batch_size, n_points, 1, 4])
     expanded_translations = tf.expand_dims(translations, axis=-1)
     matrices = tf.concat([rot_matrices, expanded_translations], axis=-1)
-    matrices = tf.concat([matrices, tf.cast(last_row, matrices.dtype)], axis=-2)
+    matrices = tf.concat(
+        [matrices, tf.cast(last_row, matrices.dtype)], axis=-2)
     return matrices
 
 
 def t_q_to_h_matrix(translations, quaternions):
-    rot_matrices = tf_transformation.rotation_matrix_3d.from_quaternion(quaternions)
+    rot_matrices = tf_transformation.rotation_matrix_3d.from_quaternion(
+        quaternions)
     return t_m_to_h_matrix(translations, rot_matrices)
 
 
@@ -50,7 +52,8 @@ class DNGFOptimizer(tf.keras.Model):
                                                trainable=True)
             self.pose_variables.append([self.six_d_rotations])
         else:
-            raise ValueError('Unknown rotation representation: ' + rotation_representation)
+            raise ValueError(
+                'Unknown rotation representation: ' + rotation_representation)
 
         self.loss_tracker = tf.keras.metrics.Mean(name='loss')
         self.clip_translation = clip_translation
@@ -83,7 +86,8 @@ class DNGFOptimizer(tf.keras.Model):
             if self.rotation_representation == 'quaternion':
                 rs = [pose.quat for pose in i_gs]
             elif self.rotation_representation == '6d':
-                rs = [np.concatenate([pose.rotation[:, 0], pose.rotation[:, 1]]) for pose in i_gs]
+                rs = [np.concatenate(
+                    [pose.rotation[:, 0], pose.rotation[:, 1]]) for pose in i_gs]
             initial_guesses[0].append(ts)
             initial_guesses[1].append(rs)
         initial_guesses = [np.array(i_g) for i_g in initial_guesses]
@@ -101,7 +105,8 @@ class DNGFOptimizer(tf.keras.Model):
         matrices = self.compute_matrices()
         matrices = tf.tile(matrices, [self.batch_size, 1, 1, 1])
         grasp_success = self.nerf_grasper.infer(
-            (None, None, None, None, inputs[0][0], inputs[0][1], inputs[0][2]), matrices, self.n_initial_guesses,
+            (None, None, None, None, inputs[0][0], inputs[0][1],
+             inputs[0][2]), matrices, self.n_initial_guesses,
             inputs[1])
         return grasp_success
 
@@ -109,8 +114,10 @@ class DNGFOptimizer(tf.keras.Model):
         if self.rotation_representation == 'quaternion':
             matrices = t_q_to_h_matrix(self.translations, self.quaternions)
         elif self.rotation_representation == '6d':
-            r_1 = tf.linalg.normalize(self.six_d_rotations[:, :, :3], axis=-1)[0]
-            r_2 = tf.linalg.normalize(self.six_d_rotations[:, :, 3:], axis=-1)[0]
+            r_1 = tf.linalg.normalize(
+                self.six_d_rotations[:, :, :3], axis=-1)[0]
+            r_2 = tf.linalg.normalize(
+                self.six_d_rotations[:, :, 3:], axis=-1)[0]
             r_3 = tf.linalg.cross(r_1, r_2)
             r_est = tf.stack([r_1, r_2, r_3], axis=-1)
             matrices = t_m_to_h_matrix(self.translations, r_est)
@@ -122,10 +129,13 @@ class DNGFOptimizer(tf.keras.Model):
                                                       self.workspace_bounds[:, 0],
                                                       self.workspace_bounds[:, 1]))
         if self.rotation_representation == 'quaternion':
-            self.quaternions.assign(tf.linalg.normalize(self.quaternions, axis=-1)[0])
+            self.quaternions.assign(
+                tf.linalg.normalize(self.quaternions, axis=-1)[0])
         elif self.rotation_representation == '6d':
-            r_1 = tf.linalg.normalize(self.six_d_rotations[:, :, :3], axis=-1)[0]
-            r_2 = tf.linalg.normalize(self.six_d_rotations[:, :, 3:], axis=-1)[0]
+            r_1 = tf.linalg.normalize(
+                self.six_d_rotations[:, :, :3], axis=-1)[0]
+            r_2 = tf.linalg.normalize(
+                self.six_d_rotations[:, :, 3:], axis=-1)[0]
             self.six_d_rotations.assign(tf.concat([r_1, r_2], axis=-1))
 
     def compute_current_grasp_success(self, inputs, features):
@@ -167,7 +177,8 @@ class DNGFOptimizer(tf.keras.Model):
         grads = tape.gradient(loss, self.pose_variables)
         for i, t_c in enumerate(train_config):
             if t_c:
-                optimize(self.optimizer[i], self.pose_variables[i], grads[i], 1.0)
+                optimize(self.optimizer[i],
+                         self.pose_variables[i], grads[i], 1.0)
         self.loss_tracker.update_state(loss)
         self.post_process()
         return {'loss': grasp_success}
