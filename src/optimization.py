@@ -1,9 +1,9 @@
 import time
-
 import numpy as np
 import tensorflow as tf
 from loguru import logger
-from .lib.simulation.tasks.picking_google_objects import PickSeenGoogleObjects
+
+from lib.agents.oracle_agent import OracleAgent
 
 
 def validate(pose_optimizer, optimization_config, valid_data):
@@ -11,17 +11,16 @@ def validate(pose_optimizer, optimization_config, valid_data):
     durations = []
     best_errors_r = []
     all_errors_r = []
-    for i, (input_data, features, task_info) in enumerate(valid_data):
-        task = PickSeenGoogleObjects(task_info)
+    for i, (input_data, features, _task_info) in enumerate(valid_data):
         logger.info(
-            f"Validating on sample {i + 1} with {len(task.manipulation_objects)} objects ...")
+            f"Validating on sample {i + 1} with {1.232} objects ...")
         losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, _ = compute_results(
             pose_optimizer,
             input_data, features, False,
             **optimization_config)
 
         result = get_step_results(
-            losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, task)
+            losses_t, losses_r, optimized_grasps_t, optimized_grasps_r)
         results.append(result)
         durations.append(duration)
         errors_r = result['r_errors']
@@ -104,8 +103,8 @@ def compute_results(pose_optimizer, input_data, features, return_trajectory, ini
     return losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, all_poses
 
 
-def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, task):
-    oracle = task.create_oracle_agent()
+def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r):
+    oracle = OracleAgent()
     # determine the best 5 grasp indices based on their final success
     best_grasp_indices_t = np.argsort(losses_t)[-5:]
     best_grasp_indices_r = np.argsort(losses_r)[-5:]
