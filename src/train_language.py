@@ -7,7 +7,7 @@ from omegaconf import DictConfig
 import hydra
 
 from lib.data_generator.language import LanguageDataGenerator
-from lib.lmvnerf.model_v3 import LanguageNeRF
+from lib.lmvnerf.model_v4 import LanguageNeRF
 from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
 from training import train_grasp_model
@@ -89,7 +89,7 @@ def main(cfg: DictConfig) -> None:
                                     workspace_bounds=cfg.generator_grasp.workspace_bounds,
                                     rotation_representation=cfg.grasp_model.rotation_representation)
     valid_data = [get_inputs(valid_dataset, i, int(cfg.validation.grasp_opt_config.optimizer_config.n_images), grasp_model) for i
-                  in cfg.valid_sample_indices]
+                  in cfg.validation.valid_sample_indices]
 
     wandb_project_name = cfg.grasp_training.model_path.split('/')[-1]
     wandb_dir = f"{cfg.grasp_training.model_path}/wandb"

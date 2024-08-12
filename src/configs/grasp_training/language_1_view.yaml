@@ -1,5 +1,5 @@
 defaults:
   - default
-model_path: "/home/jovyan/data/storage/models/grasp/v3_w_elu/language_1_view"
-backbone_path: "/home/jovyan/data/storage/models/nerf/v3_w_elu/1_view"
+model_path: "/home/jovyan/data/storage/models/grasp/v4_w_elu-val/language_1_view"
+backbone_path: "/home/jovyan/data/storage/models/nerf/v4_w_elu/1_view"
 loss: "kl_divergence"

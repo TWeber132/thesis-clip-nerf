@@ -8,8 +8,8 @@ from einops import rearrange
 from loguru import logger
 from manipulation_tasks import loader, factory
 
-from .lib.data_generator.util import camera_parameters
-from .lib.dataset.dataset import ColorDataset, MNPZDataset, NPZDataset, PickleDataset, SynchronizedDatasets
+from lib.data_generator.util import camera_parameters
+from lib.dataset.dataset import ColorDataset, MNPZDataset, NPZDataset, PickleDataset, SynchronizedDatasets
 import tensorflow as tf
 
 
