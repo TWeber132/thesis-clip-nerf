@@ -1,3 +1,6 @@
 [submodule "src/lib/dataset"]
 	path = src/lib/dataset
 	url = https://github.com/TWeber132/thesis-dataset.git
+[submodule "src/lib/simulation"]
+	path = src/lib/simulation
+	url = https://github.com/TWeber132/thesis-simulation.git
