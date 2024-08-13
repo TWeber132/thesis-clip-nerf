@@ -14,9 +14,9 @@ def validate(pose_optimizer, optimization_config, valid_data):
     durations = []
     best_errors_r = []
     all_errors_r = []
-    for i, (input_data, features, _task_info, grasp_pose_h) in enumerate(valid_data):
+    for i, (input_data, features, task_info, grasp_pose_h) in enumerate(valid_data):
         logger.info(
-            f"Validating on sample {i + 1} with {1.232} objects ...")
+            f"Validating on sample {i + 1} with {len(task_info.keys())} objects ...")
         losses_t, losses_r, optimized_grasps_t, optimized_grasps_r, duration, _ = compute_results(
             pose_optimizer,
             input_data, features, False,
@@ -110,8 +110,7 @@ def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, gt_grasp_po
     oracle = OracleAgent()
     quat = quaternions.mat2quat(gt_grasp_pose_h[:3, :3])
     quat = quat[[1, 2, 3, 0]]
-    gt_grasp_pose = [tuple([*gt_grasp_pose_h[:3, 3]]),tuple([*quat])]
-    gt_action = [gt_grasp_pose]
+    gt_pose = [tuple([*gt_grasp_pose_h[:3, 3]]),tuple([*quat])]
     
     # determine the best 5 grasp indices based on their final success
     # best_grasp_indices_t = np.argsort(losses_t)[-5:]
@@ -122,16 +121,10 @@ def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, gt_grasp_po
     final_success_r = [losses_r[k] for k in best_grasp_indices_r]
     errors_r = []
     for k in range(len(best_grasp_poses_r)):
-        print(best_grasp_poses_r[k])
         best_pose = [tuple([*best_grasp_poses_r[k].translation]), tuple([*best_grasp_poses_r[k].quat])]
-        best_action = [best_pose]
-
-        trans_error, rot_error = oracle.calculate_errors(
-            gt_action, best_action)
-        # t_error, r_error = oracle.calculate_errors(gt_action, action)
-        print(trans_error, rot_error)
-        errors_r.append([trans_error, rot_error])
-
+        error = oracle.calculate_error(gt_pose, best_pose)
+        errors_r.append(error)
+        
     results = {
         'grasp_poses': best_grasp_poses_r,
         'final_success': final_success_r,
