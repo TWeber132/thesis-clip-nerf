@@ -14,7 +14,7 @@ from lib.data_generator.mvnerf import MVNeRFDataGenerator
 from lib.mvnerf.model_v0 import MVVNeRFRenderer, render_view
 from lib.mvnerf.nerf_utils import WarmupScheduler, load_pretrained_weights
 from lib.dataset.utils import load_dataset_nerf
-from util import init_training_session
+from utils.util import init_training_session
 
 
 def compile_model(nerf_renderer):

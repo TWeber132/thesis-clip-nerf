@@ -5,7 +5,7 @@ from loguru import logger
 from transforms3d import quaternions
 
 
-from lib.agents.oracle_agent import OracleAgent
+from ..lib.agents.oracle_agent import OracleAgent
 
 
 

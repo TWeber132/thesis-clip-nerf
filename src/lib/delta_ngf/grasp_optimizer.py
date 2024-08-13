@@ -163,6 +163,7 @@ class DNGFOptimizer(tf.keras.Model):
                     rearrange(inputs[0], 'b nv h w c -> nv b h w c'),
                     rearrange(inputs[1], 'b nv r c -> nv b r c'),
                     rearrange(inputs[2], 'b nv r c -> nv b r c'),
+                    rearrange(inputs[3], 'b nv t -> nv b t'),
                 ]
                 r_features = rearrange(features, 'b nv h w c -> nv b h w c')
             else:
