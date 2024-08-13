@@ -1,6 +1,5 @@
 import os
 import sys
-
 import tensorflow as tf
 from loguru import logger
 from omegaconf import DictConfig
@@ -19,7 +18,7 @@ import wandb
 
 @hydra.main(version_base=None, config_path="configs", config_name="language_1_view")
 def main(cfg: DictConfig) -> None:
-    tf.config.run_functions_eagerly(True)
+    #tf.config.run_functions_eagerly(True)
     # allow memory growth to avoid OOM errors
     gpus = tf.config.list_physical_devices('GPU')
     for gpu in gpus:

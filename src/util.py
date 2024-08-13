@@ -49,7 +49,7 @@ def read_best_mean_error(training_progress_file):
 
 
 def log_results(epoch, results, wandb_initialized):
-    r_errors = [r['errors'] for r in results]
+    r_errors = [r['errors_r'] for r in results]
     mean_r_error = np.mean(np.concatenate(r_errors, axis=0), axis=0)
 
     best_errors_r = [errors_r[-1] for errors_r in r_errors]
