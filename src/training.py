@@ -49,7 +49,7 @@ def train_grasp_model(grasp_model, data_generator, n_epochs, eval_after_epochs, 
 
         log_results(e_epoch, results, wandb_initialized)
 
-        r_errors = [r['errors'] for r in results]
+        r_errors = [r['errors_r'] for r in results]
         best_errors_final = [errors_r[-1] for errors_r in r_errors]
         new_mean_error = np.mean(np.stack(best_errors_final, axis=0), axis=0)
 
