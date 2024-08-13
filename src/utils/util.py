@@ -10,10 +10,10 @@ from einops import rearrange
 from loguru import logger
 from manipulation_tasks import loader, factory
 
-from lib.data_generator.util import camera_parameters
-from lib.dataset.dataset import ColorDataset, MNPZDataset, NPZDataset, PickleDataset, SynchronizedDatasets
-from lib.clip.utils import preprocess_tf
-from lib.clip.utils import tokenize
+from ..lib.data_generator.util import camera_parameters
+from ..lib.dataset.dataset import ColorDataset, MNPZDataset, NPZDataset, PickleDataset, SynchronizedDatasets
+from ..lib.clip.utils import preprocess_tf
+from ..lib.clip.utils import tokenize
 
 
 def load_training_progress(eval_after_epochs, model_log_dir, n_epochs):

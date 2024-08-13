@@ -9,16 +9,16 @@ from lib.data_generator.language import LanguageDataGenerator
 from lib.lmvnerf.model_v4 import LanguageNeRF
 from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from lib.mvnerf.nerf_utils import load_pretrained_weights
-from training import train_grasp_model
+from utils.training import train_grasp_model
 from lib.dataset.utils import load_dataset_language, load_dataset_goal
-from util import get_inputs
+from utils.util import get_inputs
 
 import wandb
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="language_1_view")
 def main(cfg: DictConfig) -> None:
-    #tf.config.run_functions_eagerly(True)
+    # tf.config.run_functions_eagerly(True)
     # allow memory growth to avoid OOM errors
     gpus = tf.config.list_physical_devices('GPU')
     for gpu in gpus:

@@ -5,8 +5,8 @@ import numpy as np
 import wandb
 from loguru import logger
 
-from util import load_training_progress, log_results
-from optimization import validate
+from .util import load_training_progress, log_results
+from .optimization import validate
 
 
 def init_wandb(wandb_config):
