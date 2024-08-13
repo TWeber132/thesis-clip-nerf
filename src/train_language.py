@@ -5,13 +5,13 @@ from loguru import logger
 from omegaconf import DictConfig
 import hydra
 
-from lib.data_generator.language import LanguageDataGenerator
-from lib.lmvnerf.model_v4 import LanguageNeRF
-from lib.lmvnerf.grasp_optimizer import DNGFOptimizer
-from lib.mvnerf.nerf_utils import load_pretrained_weights
-from utils.training import train_grasp_model
-from lib.dataset.utils import load_dataset_language, load_dataset_goal
-from utils.util import get_inputs
+from src.lib.data_generator.language import LanguageDataGenerator
+from src.lib.lmvnerf.model_v4 import LanguageNeRF
+from src.lib.lmvnerf.grasp_optimizer import DNGFOptimizer
+from src.lib.mvnerf.nerf_utils import load_pretrained_weights
+from src.utils.training import train_grasp_model
+from src.lib.dataset.utils import load_dataset_language, load_dataset_goal
+from src.utils.util import get_inputs
 
 import wandb
 
