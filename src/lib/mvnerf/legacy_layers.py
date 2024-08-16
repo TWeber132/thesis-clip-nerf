@@ -66,6 +66,8 @@ class CombineCLIPVisualV2(tf.keras.Model):
 
         self.clip_feature_extraction = CLIPFeatureExtraction()
         self.clip_regulizer_loss = tf.keras.losses.CategoricalCrossentropy()
+        self.up = tf.keras.layers.UpSampling2D(
+            size=2, interpolation='bilinear')
 
     @tf.function(input_signature=[((tf.TensorSpec(shape=(None, 1024), dtype=tf.float32, name="clip_features"),
                                    tf.TensorSpec(
@@ -98,6 +100,7 @@ class CombineCLIPVisualV2(tf.keras.Model):
         loss = self.clip_regulizer_loss(clip_features, clip_features_pred)
         # Prevent the layer from ignoring the CLIP features and focus on vis
         self.add_loss(loss)
+        x = self.up(x)
         return x
 
 
