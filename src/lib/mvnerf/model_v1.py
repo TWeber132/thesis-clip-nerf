@@ -80,7 +80,7 @@ class MVVNeRFRenderer(tf.keras.Model):
         clip_images = preprocess_tf(src_images)
         clip_outputs = self.clip_visual(clip_images)
         visual_features = self.encode(src_images)
-        combined_features = self.combine_clip_visual_features(
+        combined_features = self.combine_clip_visual(
             (clip_outputs, visual_features))
         combined_features = rearrange(
             combined_features, '(b n) h w c -> b n h w c', b=self.batch_size)
