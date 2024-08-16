@@ -109,12 +109,14 @@ def get_inputs(dataset, sample_idx, n_images, grasp_model):
                   tokens]
     features = compute_features(input_data[0], tokens, grasp_model)
     task_info = dataset.datasets['info'].read_sample(sample_idx)
-    grasp_pose = dataset.datasets['grasp_pose'].read_sample(sample_idx)['grasp_pose']
+    grasp_pose = dataset.datasets['grasp_pose'].read_sample(sample_idx)[
+        'grasp_pose']
     return input_data, features, task_info, grasp_pose
 
 
 def compute_features(images, clip_tokens, grasp_model):
     src_images = rearrange(images, 'b n h w c -> (b n) h w c')
+    clip_tokens = rearrange(clip_tokens, 'b t -> b t')
 
     clip_images = preprocess_tf(src_images)
     clip_visuals = grasp_model.clip_visual(clip_images)

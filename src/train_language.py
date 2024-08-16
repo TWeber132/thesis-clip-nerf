@@ -10,7 +10,7 @@ from src.lib.lmvnerf.model_v4 import LanguageNeRF
 from src.lib.lmvnerf.grasp_optimizer import DNGFOptimizer
 from src.lib.mvnerf.nerf_utils import load_pretrained_weights
 from src.utils.training import train_grasp_model
-from src.lib.dataset.utils import load_dataset_language, load_dataset_goal
+from src.lib.dataset.utils import load_dataset_language
 from src.utils.util import get_inputs
 
 import wandb
