@@ -50,10 +50,9 @@ class LanguageNeRF(tf.keras.Model):
                                                        embed_direction_vector=True,
                                                        complete_output=True)
         self.visual_features = VisualFeatures(n_features, original_image_size)
-        self.clip_visual = CLIPVisualEncoder()
-        self.clip_textual = CLIPTextualEncoder()
         self.grasp_readout = GraspReadout(use_bias=True)
-        self.combine_clip_visual = CombineCLIPVisualV3(use_dense=True)
+        self.up = tf.keras.layers.UpSampling2D(
+            size=(2, 2), interpolation='bilinear')
 
         self.mse = tf.keras.losses.MeanSquaredError()
         self.cosine_similarity = tf.keras.losses.CosineSimilarity(axis=-1)
@@ -129,7 +128,6 @@ class LanguageNeRF(tf.keras.Model):
     def load_backbone(self, path, verbose=True):
         fine_embedding_path = f'{path}_fine_embedding'
         visual_features_path = f'{path}_visual_features'
-        combine_clip_visual_path = f'{path}_combine_clip_visual'
         # check if <path>.index exists for all paths above
         if not os.path.exists(f'{fine_embedding_path}.index'):
             if verbose:
@@ -139,24 +137,17 @@ class LanguageNeRF(tf.keras.Model):
             if verbose:
                 print(f'{visual_features_path}.index does not exist')
             return False
-        if not os.path.exists(f'{combine_clip_visual_path}.index'):
-            if verbose:
-                print(f'{combine_clip_visual_path}.index does not exist')
-            return False
 
         self.fine_embedding.load_weights(fine_embedding_path)
         self.visual_features.load_weights(visual_features_path)
-        self.combine_clip_visual.load_weights(combine_clip_visual_path)
         return True
 
     def store(self, path):
         fine_embedding_path = f'{path}_fine_embedding'
         visual_features_path = f'{path}_visual_features'
-        combine_clip_visual_path = f'{path}_combine_clip_visual'
         grasp_readout_path = f'{path}_grasp_readout'
         self.fine_embedding.save_weights(fine_embedding_path)
         self.visual_features.save_weights(visual_features_path)
-        self.combine_clip_visual.save_weights(combine_clip_visual_path)
         self.grasp_readout.save_weights(grasp_readout_path)
 
     def load(self, path):
@@ -174,17 +165,13 @@ class LanguageNeRF(tf.keras.Model):
         src_images = inputs[4]
         clip_tokens = inputs[7]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
-        clip_images = preprocess_tf(src_images)
-        clip_visuals = self.clip_visual(clip_images)
         visual_features = self.visual_features(src_images)
-        clip_textuals = self.clip_textual(clip_tokens)      # [(BN) 1024]
-        combined_features = self.combine_clip_visual(
-            (clip_visuals, visual_features, clip_textuals))
-        combined_features = rearrange(
-            combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
+        visual_features = self.up(visual_features)
+        visual_features = rearrange(
+            visual_features, '(b n) h w c -> b n h w c', n=self.n_views)
         # transforms = t_q_to_h_matrix(self.translations, self.quaternions)
         transforms = self.compute_matrices()
-        return self._call(inputs, transforms, self.n_points_train, combined_features)
+        return self._call(inputs, transforms, self.n_points_train, visual_features)
 
     def compute_matrices(self):
         if self.rotation_representation == 'quaternion':
@@ -276,19 +263,14 @@ class LanguageNeRF(tf.keras.Model):
         clip_tokens = inputs[7]
         src_images = rearrange(src_images, 'b n h w c -> (b n) h w c')
         visual_features = self.visual_features(src_images)
-        clip_images = preprocess_tf(src_images)
-        clip_outputs = self.clip_visual(clip_images)
-        visual_features = self.visual_features(src_images)
-        clip_textuals = self.clip_textual(clip_tokens)
-        combined_features = self.combine_clip_visual_features(
-            (clip_outputs, visual_features, clip_textuals))
-        combined_features = rearrange(
-            combined_features, '(b n) h w c -> b n h w c', n=self.n_views)
+        visual_features = self.up(visual_features)
+        visual_features = rearrange(
+            visual_features, '(b n) h w c -> b n h w c', n=self.n_views)
         transforms = self.compute_matrices()
         with tf.GradientTape(watch_accessed_variables=False) as tape:
             tape.watch(self.grasp_readout.trainable_variables)
             y_pred = self._call(inputs, transforms,
-                                self.n_points_train, combined_features)
+                                self.n_points_train, visual_features)
             if self.softmax_before_loss:
                 y_pred = tf.nn.softmax(y_pred)
             landscape_loss = self.loss(labels[0], y_pred)
@@ -300,7 +282,7 @@ class LanguageNeRF(tf.keras.Model):
             with tf.GradientTape() as tape_1:
                 transforms = self.compute_matrices()
                 prediction = self._call(
-                    inputs, transforms, self.n_points_train, combined_features)
+                    inputs, transforms, self.n_points_train, visual_features)
             output_gradients = tape_1.gradient(prediction, self.pose_variables)
             loss_t = self.cosine_similarity(labels[1], output_gradients[0])
 

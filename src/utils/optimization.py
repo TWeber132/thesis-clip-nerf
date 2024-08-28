@@ -8,7 +8,6 @@ from transforms3d import quaternions
 from ..lib.agents.oracle_agent import OracleAgent
 
 
-
 def validate(pose_optimizer, optimization_config, valid_data):
     results = []
     durations = []
@@ -110,8 +109,8 @@ def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, gt_grasp_po
     oracle = OracleAgent()
     quat = quaternions.mat2quat(gt_grasp_pose_h[:3, :3])
     quat = quat[[1, 2, 3, 0]]
-    gt_pose = [tuple([*gt_grasp_pose_h[:3, 3]]),tuple([*quat])]
-    
+    gt_pose = [tuple([*gt_grasp_pose_h[:3, 3]]), tuple([*quat])]
+
     # determine the best 5 grasp indices based on their final success
     # best_grasp_indices_t = np.argsort(losses_t)[-5:]
     best_grasp_indices_r = np.argsort(losses_r)[-5:]
@@ -121,10 +120,11 @@ def get_step_results(losses_t, losses_r, trajectory_t, trajectory_r, gt_grasp_po
     final_success_r = [losses_r[k] for k in best_grasp_indices_r]
     errors_r = []
     for k in range(len(best_grasp_poses_r)):
-        best_pose = [tuple([*best_grasp_poses_r[k].translation]), tuple([*best_grasp_poses_r[k].quat])]
+        best_pose = [tuple([*best_grasp_poses_r[k].translation]),
+                     tuple([*best_grasp_poses_r[k].quat])]
         error = oracle.calculate_error(gt_pose, best_pose)
         errors_r.append(error)
-        
+
     results = {
         'grasp_poses': best_grasp_poses_r,
         'final_success': final_success_r,

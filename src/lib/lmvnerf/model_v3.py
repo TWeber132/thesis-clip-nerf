@@ -281,7 +281,6 @@ class LanguageNeRF(tf.keras.Model):
         visual_features = self.visual_features(src_images)
         clip_images = preprocess_tf(src_images)
         clip_outputs = self.clip_visual(clip_images)
-        visual_features = self.visual_features(src_images)
         clip_textuals = self.clip_textual(clip_tokens)
         combined_features = self.combine_clip_visual(
             (clip_outputs, visual_features, clip_textuals))

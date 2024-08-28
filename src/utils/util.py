@@ -128,3 +128,12 @@ def compute_features(images, clip_tokens, grasp_model):
     combined_features = rearrange(
         combined_features, '(b n) h w c -> b n h w c', b=images.shape[0])
     return combined_features
+
+
+def compute_features_wo(images, grasp_model):
+    src_images = rearrange(images, 'b n h w c -> (b n) h w c')
+    visual_features = grasp_model.visual_features(src_images)
+    visual_features = grasp_model.up(visual_features)
+    visual_features = rearrange(
+        visual_features, '(b n) h w c -> b n h w c', b=images.shape[0])
+    return visual_features
